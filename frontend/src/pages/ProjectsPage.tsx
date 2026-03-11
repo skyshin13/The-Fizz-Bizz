@@ -2,29 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 import { Project, FermentationType } from '../types'
+import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
 import { Plus, Search, Filter, FlaskConical, Clock, Trash2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-
-const TYPE_EMOJI: Record<string, string> = {
-  kombucha: '🍵', probiotic_soda: '🫙', lacto_fermentation: '🥒',
-  alcohol_brewing: '🍺', kimchi: '🌶️', water_kefir: '💧',
-  milk_kefir: '🥛', mead: '🍯', cider: '🍎', beer: '🍻', wine: '🍷', general: '🧪'
-}
-
-const TYPES: { value: FermentationType; label: string }[] = [
-  { value: 'kombucha', label: 'Kombucha' },
-  { value: 'probiotic_soda', label: 'Probiotic Soda' },
-  { value: 'beer', label: 'Beer' },
-  { value: 'wine', label: 'Wine' },
-  { value: 'mead', label: 'Mead' },
-  { value: 'cider', label: 'Cider' },
-  { value: 'kimchi', label: 'Kimchi' },
-  { value: 'lacto_fermentation', label: 'Lacto-Fermentation' },
-  { value: 'water_kefir', label: 'Water Kefir' },
-  { value: 'milk_kefir', label: 'Milk Kefir' },
-  { value: 'general', label: 'General' },
-]
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -32,6 +13,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showCreate, setShowCreate] = useState(false)
+  const { types, getEmoji } = useFermentationTypes()
 
   const load = () => api.get('/projects/').then(r => setProjects(r.data)).finally(() => setLoading(false))
   useEffect(() => { load() }, [])
@@ -90,7 +72,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {showCreate && <CreateProjectModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
+      {showCreate && <CreateProjectModal types={types} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
     </div>
   )
 }
@@ -103,7 +85,7 @@ function ProjectRow({ project, onDelete }: { project: Project; onDelete: () => v
     <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', position: 'relative' }}>
       <Link to={`/projects/${project.id}`} style={{ display: 'block', padding: '1.25rem' }}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-          <span style={{ fontSize: '2.25rem', lineHeight: 1, flexShrink: 0 }}>{TYPE_EMOJI[project.fermentation_type] || '🧪'}</span>
+          <span style={{ fontSize: '2.25rem', lineHeight: 1, flexShrink: 0 }}>{getEmoji(project.fermentation_type)}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
               <h3 style={{ fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.name}</h3>
@@ -136,7 +118,7 @@ function ProjectRow({ project, onDelete }: { project: Project; onDelete: () => v
   )
 }
 
-function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateProjectModal({ types, onClose, onCreated }: { types: { value: string; label: string }[]; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
     name: '', fermentation_type: 'kombucha' as FermentationType,
     description: '', batch_size_liters: '', initial_gravity: '', initial_ph: '',

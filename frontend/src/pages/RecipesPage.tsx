@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
 import api from '../lib/api'
 import { Recipe } from '../types'
+import { useFermentationTypes } from '../hooks/useLookups'
 import { Clock, ChefHat, Users, BookOpen } from 'lucide-react'
-
-const TYPE_EMOJI: Record<string, string> = {
-  kombucha: '🍵', probiotic_soda: '🫙', lacto_fermentation: '🥒',
-  beer: '🍻', wine: '🍷', mead: '🍯', cider: '🍎', kimchi: '🌶️',
-  water_kefir: '💧', general: '🧪'
-}
 
 const DIFF_COLOR: Record<string, string> = {
   beginner: 'var(--moss)', intermediate: 'var(--amber)', advanced: 'var(--rust)'
@@ -17,6 +12,7 @@ export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Recipe | null>(null)
+  const { getEmoji } = useFermentationTypes()
 
   useEffect(() => {
     api.get('/recipes').then(r => setRecipes(r.data)).finally(() => setLoading(false))
@@ -38,7 +34,7 @@ export default function RecipesPage() {
               <div key={recipe.id} onClick={() => setSelected(selected?.id === recipe.id ? null : recipe)}
                 style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem', border: `1px solid ${selected?.id === recipe.id ? 'var(--amber)' : 'var(--border-light)'}`, cursor: 'pointer', transition: 'all 0.2s' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '2.25rem', flexShrink: 0 }}>{TYPE_EMOJI[recipe.fermentation_type] || '🧪'}</span>
+                  <span style={{ fontSize: '2.25rem', flexShrink: 0 }}>{getEmoji(recipe.fermentation_type)}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                       <h3 style={{ fontSize: '0.95rem' }}>{recipe.name}</h3>
@@ -73,7 +69,7 @@ export default function RecipesPage() {
           {selected && (
             <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--amber)', position: 'sticky', top: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                <span style={{ fontSize: '2.5rem' }}>{TYPE_EMOJI[selected.fermentation_type] || '🧪'}</span>
+                <span style={{ fontSize: '2.5rem' }}>{getEmoji(selected.fermentation_type)}</span>
                 <div>
                   <h2 style={{ fontSize: '1.1rem' }}>{selected.name}</h2>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>

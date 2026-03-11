@@ -5,6 +5,7 @@ Run: python -m app.db.seed
 from app.db.database import SessionLocal, engine
 from app.models.models import Base, User, FermentationProject, MeasurementLog, ObservationNote
 from app.models.models import YeastProfile, Recipe, RecipeIngredient, FermentationType, ProjectStatus
+from app.models.models import FermentationTypeConfig, SugarType
 from app.core.security import get_password_hash
 from datetime import datetime, timedelta
 
@@ -20,6 +21,36 @@ def seed():
         return
 
     print("Seeding database...")
+
+    # ── Fermentation Type Configs ──────────────────────────────────────────────
+    fermentation_type_configs = [
+        FermentationTypeConfig(value="kombucha", label="Kombucha", emoji="🍵", color="#4a6741", description="Fermented tea using a SCOBY culture", sort_order=0),
+        FermentationTypeConfig(value="probiotic_soda", label="Probiotic Soda", emoji="🫙", color="#3d7d5e", description="Naturally carbonated probiotic beverages", sort_order=1),
+        FermentationTypeConfig(value="beer", label="Beer", emoji="🍻", color="#b8860b", description="Grain-based alcoholic fermentation", sort_order=2),
+        FermentationTypeConfig(value="wine", label="Wine", emoji="🍷", color="#8b0000", description="Fruit-based alcoholic fermentation", sort_order=3),
+        FermentationTypeConfig(value="mead", label="Mead", emoji="🍯", color="#d4a017", description="Honey-based alcoholic fermentation", sort_order=4),
+        FermentationTypeConfig(value="cider", label="Cider", emoji="🍎", color="#c84e00", description="Apple or pear-based alcoholic fermentation", sort_order=5),
+        FermentationTypeConfig(value="kimchi", label="Kimchi", emoji="🌶️", color="#c0392b", description="Lacto-fermented Korean vegetables", sort_order=6),
+        FermentationTypeConfig(value="lacto_fermentation", label="Lacto-Fermentation", emoji="🥒", color="#5a8a3c", description="Salt-brine vegetable fermentation", sort_order=7),
+        FermentationTypeConfig(value="water_kefir", label="Water Kefir", emoji="💧", color="#2980b9", description="Probiotic fermented sugar water", sort_order=8),
+        FermentationTypeConfig(value="milk_kefir", label="Milk Kefir", emoji="🥛", color="#a0a0a0", description="Probiotic fermented dairy drink", sort_order=9),
+        FermentationTypeConfig(value="alcohol_brewing", label="Alcohol Brewing", emoji="🍺", color="#b8860b", description="General alcohol fermentation", sort_order=10),
+        FermentationTypeConfig(value="general", label="General", emoji="🧪", color="#6c757d", description="Other fermentation projects", sort_order=11),
+    ]
+    for ftc in fermentation_type_configs:
+        db.add(ftc)
+
+    # ── Sugar Types ────────────────────────────────────────────────────────────
+    sugar_types = [
+        SugarType(value="table_sugar", label="Table Sugar (Sucrose)", description="Common household sugar, highly fermentable and neutral in flavor", sort_order=0),
+        SugarType(value="corn_sugar", label="Corn Sugar (Dextrose)", description="100% fermentable monosaccharide, produces clean results with no residual flavor", sort_order=1),
+        SugarType(value="honey", label="Honey", description="Natural sugar with floral notes, approx 75-80% fermentable", sort_order=2),
+        SugarType(value="DME", label="Dry Malt Extract (DME)", description="Adds body and malt character, about 75% fermentable", sort_order=3),
+    ]
+    for st in sugar_types:
+        db.add(st)
+
+    db.flush()
 
     # ── Demo User ─────────────────────────────────────────────────────────────
     user = User(
@@ -288,7 +319,7 @@ def seed():
 
     db.commit()
     db.close()
-    print("✅ Database seeded successfully!")
+    print("Database seeded successfully!")
     print("   Demo login: brewer@fizzbizz.com / password123")
 
 

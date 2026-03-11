@@ -1,3 +1,21 @@
+export interface FermentationTypeConfig {
+  id: number
+  value: string
+  label: string
+  emoji: string
+  color?: string
+  description?: string
+  sort_order: number
+}
+
+export interface SugarType {
+  id: number
+  value: string
+  label: string
+  description?: string
+  sort_order: number
+}
+
 export type FermentationType =
   | 'kombucha'
   | 'probiotic_soda'

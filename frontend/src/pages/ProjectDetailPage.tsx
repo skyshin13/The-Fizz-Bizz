@@ -2,15 +2,11 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../lib/api'
 import { Project, Measurement } from '../types'
+import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { format, parseISO } from 'date-fns'
-
-const TYPE_EMOJI: Record<string, string> = {
-  kombucha: '🍵', probiotic_soda: '🫙', lacto_fermentation: '🥒',
-  alcohol_brewing: '🍺', kimchi: '🌶️', mead: '🍯', beer: '🍻', wine: '🍷', general: '🧪'
-}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +15,7 @@ export default function ProjectDetailPage() {
   const [showMeasure, setShowMeasure] = useState(false)
   const [showNote, setShowNote] = useState(false)
   const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'abv' | 'co2'>('ph')
+  const { getEmoji } = useFermentationTypes()
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
   useEffect(() => { load() }, [id])
@@ -49,7 +46,7 @@ export default function ProjectDetailPage() {
         </Link>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ fontSize: '3rem' }}>{TYPE_EMOJI[project.fermentation_type] || '🧪'}</span>
+            <span style={{ fontSize: '3rem' }}>{getEmoji(project.fermentation_type)}</span>
             <div>
               <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>{project.name}</h1>
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>

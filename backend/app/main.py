@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.database import Base, engine
-from app.api.routes import auth, users, projects, yeasts, recipes, calculations
+from app.api.routes import auth, users, projects, yeasts, recipes, calculations, lookup
 
 # Create all tables on startup
 Base.metadata.create_all(bind=engine)
@@ -30,6 +30,7 @@ app.include_router(projects.router, prefix="/api")
 app.include_router(yeasts.router, prefix="/api")
 app.include_router(recipes.router, prefix="/api")
 app.include_router(calculations.router, prefix="/api")
+app.include_router(lookup.router, prefix="/api")
 
 
 @app.get("/")

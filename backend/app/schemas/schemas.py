@@ -278,6 +278,32 @@ class RecipeOut(BaseModel):
         from_attributes = True
 
 
+# ─── Lookup Schemas ──────────────────────────────────────────────────────────
+
+class FermentationTypeConfigOut(BaseModel):
+    id: int
+    value: str
+    label: str
+    emoji: str
+    color: Optional[str] = None
+    description: Optional[str] = None
+    sort_order: int
+
+    class Config:
+        from_attributes = True
+
+
+class SugarTypeOut(BaseModel):
+    id: int
+    value: str
+    label: str
+    description: Optional[str] = None
+    sort_order: int
+
+    class Config:
+        from_attributes = True
+
+
 # ─── Calculations ────────────────────────────────────────────────────────────
 
 class ABVCalculationRequest(BaseModel):

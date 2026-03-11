@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import api from '../lib/api'
+import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
 import { Calculator, FlaskConical, Zap } from 'lucide-react'
 
@@ -103,6 +104,7 @@ function ABVCalculator() {
 }
 
 function PrimingSugarCalculator() {
+  const { sugarTypes } = useSugarTypes()
   const [form, setForm] = useState({
     batch_size_liters: '19',
     current_gravity: '1.010',
@@ -163,10 +165,9 @@ function PrimingSugarCalculator() {
           <div>
             <label style={lStyle}>Sugar Type</label>
             <select value={form.sugar_type} onChange={set('sugar_type')} style={iStyle}>
-              <option value="table_sugar">Table Sugar (Sucrose)</option>
-              <option value="corn_sugar">Corn Sugar (Dextrose)</option>
-              <option value="honey">Honey</option>
-              <option value="DME">Dry Malt Extract (DME)</option>
+              {sugarTypes.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
             </select>
           </div>
         </div>

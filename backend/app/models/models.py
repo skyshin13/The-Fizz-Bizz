@@ -209,6 +209,28 @@ class Recipe(Base):
     projects = relationship("FermentationProject", back_populates="recipe")
 
 
+class FermentationTypeConfig(Base):
+    __tablename__ = "fermentation_type_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    value = Column(String, unique=True, nullable=False)   # e.g. "kombucha"
+    label = Column(String, nullable=False)                # e.g. "Kombucha"
+    emoji = Column(String, nullable=False)                # e.g. "🍵"
+    color = Column(String)                                # e.g. "#4a6741"
+    description = Column(Text)
+    sort_order = Column(Integer, default=0)
+
+
+class SugarType(Base):
+    __tablename__ = "sugar_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    value = Column(String, unique=True, nullable=False)   # e.g. "table_sugar"
+    label = Column(String, nullable=False)                # e.g. "Table Sugar (Sucrose)"
+    description = Column(Text)
+    sort_order = Column(Integer, default=0)
+
+
 class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredients"
 

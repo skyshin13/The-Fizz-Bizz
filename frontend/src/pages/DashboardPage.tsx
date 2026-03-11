@@ -3,14 +3,9 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
 import { Project } from '../types'
+import { useFermentationTypes } from '../hooks/useLookups'
 import { FlaskConical, TrendingUp, CheckCircle, Clock, Plus, Activity } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-
-const TYPE_EMOJI: Record<string, string> = {
-  kombucha: '🍵', probiotic_soda: '🫙', lacto_fermentation: '🥒',
-  alcohol_brewing: '🍺', kimchi: '🌶️', water_kefir: '💧',
-  milk_kefir: '🥛', mead: '🍯', cider: '🍎', beer: '🍻', wine: '🍷', general: '🧪'
-}
 
 const STATUS_COLOR: Record<string, string> = {
   active: '#4a6741', completed: '#3d4e5c', failed: '#b54a2c', paused: '#c8832a'
@@ -20,6 +15,7 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const { getEmoji } = useFermentationTypes()
 
   useEffect(() => {
     api.get('/projects/').then(r => setProjects(r.data)).finally(() => setLoading(false))
@@ -80,7 +76,7 @@ export default function DashboardPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
             {active.map(project => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard key={project.id} project={project} getEmoji={getEmoji} />
             ))}
           </div>
         )}
@@ -93,7 +89,7 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {completed.slice(0, 3).map(project => (
               <Link key={project.id} to={`/projects/${project.id}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1rem', background: 'var(--card-bg)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <span style={{ fontSize: '1.5rem' }}>{TYPE_EMOJI[project.fermentation_type] || '🧪'}</span>
+                <span style={{ fontSize: '1.5rem' }}>{getEmoji(project.fermentation_type)}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{project.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -110,7 +106,7 @@ export default function DashboardPage() {
   )
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, getEmoji }: { project: Project; getEmoji: (v: string) => string }) {
   const latestPh = project.measurements.filter(m => m.ph != null).at(-1)?.ph
   const latestSg = project.measurements.filter(m => m.specific_gravity != null).at(-1)?.specific_gravity
   const latestAbv = project.measurements.filter(m => m.alcohol_by_volume != null).at(-1)?.alcohol_by_volume
@@ -127,7 +123,7 @@ function ProjectCard({ project }: { project: Project }) {
       {/* Card header */}
       <div style={{ padding: '1.25rem 1.25rem 1rem', borderBottom: '1px solid var(--border-light)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-          <span style={{ fontSize: '2rem', lineHeight: 1 }}>{TYPE_EMOJI[project.fermentation_type] || '🧪'}</span>
+          <span style={{ fontSize: '2rem', lineHeight: 1 }}>{getEmoji(project.fermentation_type)}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{ fontSize: '0.95rem', marginBottom: '0.25rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.name}</h3>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
