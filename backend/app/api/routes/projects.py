@@ -1,0 +1,155 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session, joinedload
+from typing import List
+from app.db.database import get_db
+from app.models.models import FermentationProject, MeasurementLog, ObservationNote, User
+from app.schemas.schemas import (
+    ProjectCreate, ProjectUpdate, ProjectOut,
+    MeasurementCreate, MeasurementOut,
+    ObservationCreate, ObservationOut,
+)
+from app.api.deps import get_current_user
+from app.services.calculations import calculate_abv
+
+router = APIRouter(prefix="/projects", tags=["Projects"])
+
+
+@router.get("/", response_model=List[ProjectOut])
+def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return (
+        db.query(FermentationProject)
+        .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.observations))
+        .filter(FermentationProject.user_id == current_user.id)
+        .order_by(FermentationProject.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/", response_model=ProjectOut, status_code=201)
+def create_project(
+    body: ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = FermentationProject(**body.model_dump(), user_id=current_user.id)
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@router.get("/{project_id}", response_model=ProjectOut)
+def get_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = (
+        db.query(FermentationProject)
+        .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.observations))
+        .filter(FermentationProject.id == project_id, FermentationProject.user_id == current_user.id)
+        .first()
+    )
+    if not project:
+        raise HTTPException(404, "Project not found")
+    return project
+
+
+@router.patch("/{project_id}", response_model=ProjectOut)
+def update_project(
+    project_id: int,
+    body: ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter(
+        FermentationProject.id == project_id,
+        FermentationProject.user_id == current_user.id,
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(project, field, value)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter(
+        FermentationProject.id == project_id,
+        FermentationProject.user_id == current_user.id,
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+    db.delete(project)
+    db.commit()
+
+
+# ─── Measurements ──────────────────────────────────────────────────────────
+
+@router.get("/{project_id}/measurements", response_model=List[MeasurementOut])
+def list_measurements(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter(
+        FermentationProject.id == project_id, FermentationProject.user_id == current_user.id
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+    return db.query(MeasurementLog).filter(MeasurementLog.project_id == project_id).order_by(MeasurementLog.logged_at).all()
+
+
+@router.post("/{project_id}/measurements", response_model=MeasurementOut, status_code=201)
+def add_measurement(
+    project_id: int,
+    body: MeasurementCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter(
+        FermentationProject.id == project_id, FermentationProject.user_id == current_user.id
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    measurement = MeasurementLog(**body.model_dump(), project_id=project_id)
+
+    # Auto-calculate ABV if we have gravity readings
+    if body.specific_gravity and project.initial_gravity:
+        abv_result = calculate_abv(project.initial_gravity, body.specific_gravity)
+        measurement.alcohol_by_volume = abv_result.abv_percent
+
+    db.add(measurement)
+    db.commit()
+    db.refresh(measurement)
+    return measurement
+
+
+# ─── Observations ──────────────────────────────────────────────────────────
+
+@router.post("/{project_id}/observations", response_model=ObservationOut, status_code=201)
+def add_observation(
+    project_id: int,
+    body: ObservationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter(
+        FermentationProject.id == project_id, FermentationProject.user_id == current_user.id
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    obs = ObservationNote(**body.model_dump(), project_id=project_id, user_id=current_user.id)
+    db.add(obs)
+    db.commit()
+    db.refresh(obs)
+    return obs

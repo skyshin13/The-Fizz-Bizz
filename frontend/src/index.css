@@ -1,0 +1,97 @@
+:root {
+  --cream: #f5f0e8;
+  --parchment: #ede5d0;
+  --warm-white: #faf8f3;
+  --brown-dark: #2c1f14;
+  --brown-mid: #5c3d2e;
+  --brown-light: #8b6552;
+  --amber: #c8832a;
+  --amber-light: #e8a84a;
+  --amber-glow: #f5c76e;
+  --moss: #4a6741;
+  --moss-light: #7a9e74;
+  --rust: #b54a2c;
+  --slate: #3d4e5c;
+  --text-primary: #1e140a;
+  --text-secondary: #6b4f3a;
+  --text-muted: #9b8070;
+  --border: #d5c5b0;
+  --border-light: #e8dece;
+  --card-bg: #fdfaf5;
+  --shadow-sm: 0 1px 3px rgba(44, 31, 20, 0.08);
+  --shadow-md: 0 4px 12px rgba(44, 31, 20, 0.12);
+  --shadow-lg: 0 8px 24px rgba(44, 31, 20, 0.16);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background-color: var(--warm-white);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--brown-dark);
+}
+
+a { color: inherit; text-decoration: none; }
+
+button {
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.2s;
+}
+
+input, textarea, select {
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--parchment); }
+::-webkit-scrollbar-thumb { background: var(--brown-light); border-radius: 3px; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bubbleFloat {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+  50% { transform: translateY(-20px) scale(1.1); opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.fade-in { animation: fadeIn 0.4s ease forwards; }
+.fade-in-delay-1 { animation: fadeIn 0.4s ease 0.1s both; }
+.fade-in-delay-2 { animation: fadeIn 0.4s ease 0.2s both; }
+.fade-in-delay-3 { animation: fadeIn 0.4s ease 0.3s both; }
+
+/* Loading spinner */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
