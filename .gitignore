@@ -1,0 +1,34 @@
+# Environment & secrets
+.env
+*.env
+config.ini
+
+# SQLite temp files
+*.sqlite-shm
+*.sqlite-wal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Node
+node_modules/
+
+# Compiled / output
+*.o
+*.out
+dist/
+build/
