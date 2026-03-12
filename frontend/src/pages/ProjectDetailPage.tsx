@@ -6,7 +6,7 @@ import { Project } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
@@ -16,6 +16,7 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showMeasure, setShowMeasure] = useState(false)
   const [showNote, setShowNote] = useState(false)
+  const [showComplete, setShowComplete] = useState(false)
   const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'co2'>('ph')
   const [activeTab, setActiveTab] = useState<'log' | 'album'>('log')
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -45,6 +46,13 @@ export default function ProjectDetailPage() {
     ? Math.floor((Date.now() - new Date(project.start_date).getTime()) / 86400000)
     : null
 
+  const ALCOHOL_TYPES = ['beer', 'wine', 'mead', 'cider', 'alcohol_brewing', 'kombucha', 'water_kefir', 'milk_kefir']
+  const isAlcohol = ALCOHOL_TYPES.includes(project.fermentation_type)
+
+  const finalAbv = (project.initial_gravity && project.final_gravity)
+    ? Math.max(0, (project.initial_gravity - project.final_gravity) * 131.25)
+    : null
+
   return (
     <div style={{ padding: '2.5rem', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Header */}
@@ -64,7 +72,12 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {project.status === 'active' && (
+              <button onClick={() => setShowComplete(true)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--moss)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--moss)', background: 'var(--card-bg)' }}>
+                <CheckCircle size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Complete Project
+              </button>
+            )}
             <button onClick={() => setShowNote(true)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)' }}>
               <BookOpen size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Add Note
             </button>
@@ -80,7 +93,14 @@ export default function ProjectDetailPage() {
         {[
           { label: 'Current pH', value: latestM?.ph?.toFixed(1), icon: Droplets, color: 'var(--moss)' },
           { label: 'Gravity (SG)', value: latestM?.specific_gravity?.toFixed(3), icon: FlaskConical, color: 'var(--amber)' },
-          { label: 'Est. ABV', value: latestM?.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined, icon: Activity, color: 'var(--rust)' },
+          {
+            label: project.status === 'completed' && finalAbv !== null ? 'Final ABV' : 'Est. ABV',
+            value: project.status === 'completed' && finalAbv !== null
+              ? `${finalAbv.toFixed(1)}%`
+              : latestM?.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined,
+            icon: Activity,
+            color: 'var(--rust)',
+          },
           { label: 'Temp (°C)', value: latestM?.temperature_celsius?.toFixed(1), icon: Thermometer, color: 'var(--slate)' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border-light)' }}>
@@ -290,6 +310,14 @@ export default function ProjectDetailPage() {
 
       {showMeasure && <MeasurementModal projectId={project.id} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
       {showNote && <NoteModal projectId={project.id} onClose={() => setShowNote(false)} onAdded={() => { setShowNote(false); load() }} />}
+      {showComplete && (
+        <CompleteProjectModal
+          project={project}
+          isAlcohol={isAlcohol}
+          onClose={() => setShowComplete(false)}
+          onCompleted={() => { setShowComplete(false); load() }}
+        />
+      )}
     </div>
   )
 }
@@ -464,6 +492,80 @@ function ModalFooter({ onClose, loading, submitLabel }: { onClose: () => void; l
         {loading ? 'Saving...' : submitLabel}
       </button>
     </div>
+  )
+}
+
+function CompleteProjectModal({ project, isAlcohol, onClose, onCompleted }: {
+  project: Project
+  isAlcohol: boolean
+  onClose: () => void
+  onCompleted: () => void
+}) {
+  const lastSg = project.measurements.filter(m => m.specific_gravity).at(-1)?.specific_gravity
+  const [finalGravity, setFinalGravity] = useState(lastSg?.toString() ?? '')
+  const [loading, setLoading] = useState(false)
+
+  const fg = parseFloat(finalGravity)
+  const previewAbv = (isAlcohol && project.initial_gravity && fg && !isNaN(fg))
+    ? Math.max(0, (project.initial_gravity - fg) * 131.25).toFixed(1)
+    : null
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      await api.patch(`/projects/${project.id}`, {
+        status: 'completed',
+        end_date: new Date().toISOString(),
+        ...(isAlcohol && fg && !isNaN(fg) ? { final_gravity: fg } : {}),
+      })
+      toast.success('Project completed!')
+      onCompleted()
+    } catch {
+      toast.error('Failed to complete project')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="Complete Project" onClose={onClose}>
+      <form onSubmit={submit}>
+        {isAlcohol && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={lStyle}>Final Gravity (FG)</label>
+              <input
+                type="number" step="0.001" value={finalGravity}
+                onChange={e => setFinalGravity(e.target.value)}
+                placeholder={lastSg?.toString() ?? '1.010'}
+                style={iStyle}
+              />
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
+                {lastSg ? `Last logged SG: ${lastSg.toFixed(3)}` : 'Enter your final hydrometer reading'}
+              </p>
+            </div>
+            {previewAbv && (
+              <div style={{ background: 'var(--parchment)', borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Calculated Final ABV</p>
+                <p style={{ fontFamily: 'Fraunces, serif', fontSize: '2rem', color: 'var(--amber)' }}>{previewAbv}%</p>
+                {project.initial_gravity && (
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    OG {project.initial_gravity.toFixed(3)} → FG {fg.toFixed(3)}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+          {isAlcohol
+            ? 'Marking this project as complete will lock in your final ABV.'
+            : 'Mark this batch as complete. This will record today as the end date.'}
+        </p>
+        <ModalFooter onClose={onClose} loading={loading} submitLabel="Complete Project" />
+      </form>
+    </Modal>
   )
 }
 
