@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
+import { supabase } from '../lib/supabase'
 import { Project, FermentationType } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
+import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, Search, Filter, FlaskConical, Clock, Trash2 } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, ImagePlus, X } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function ProjectsPage() {
@@ -67,7 +69,7 @@ export default function ProjectsPage() {
       ) : (
         <div className="fade-in-delay-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
           {filtered.map(project => (
-            <ProjectRow key={project.id} project={project} onDelete={() => deleteProject(project.id)} />
+            <ProjectRow key={project.id} project={project} onDelete={() => deleteProject(project.id)} getEmoji={getEmoji} />
           ))}
         </div>
       )}
@@ -77,12 +79,15 @@ export default function ProjectsPage() {
   )
 }
 
-function ProjectRow({ project, onDelete }: { project: Project; onDelete: () => void }) {
+function ProjectRow({ project, onDelete, getEmoji }: { project: Project; onDelete: () => void; getEmoji: (type: string) => string }) {
   const latestPh = project.measurements.filter(m => m.ph).at(-1)?.ph
   const latestAbv = project.measurements.filter(m => m.alcohol_by_volume).at(-1)?.alcohol_by_volume
 
   return (
     <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', position: 'relative' }}>
+      {project.cover_photo_url && (
+        <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }} />
+      )}
       <Link to={`/projects/${project.id}`} style={{ display: 'block', padding: '1.25rem' }}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
           <span style={{ fontSize: '2.25rem', lineHeight: 1, flexShrink: 0 }}>{getEmoji(project.fermentation_type)}</span>
@@ -118,32 +123,69 @@ function ProjectRow({ project, onDelete }: { project: Project; onDelete: () => v
   )
 }
 
-function CreateProjectModal({ types, onClose, onCreated }: { types: { value: string; label: string }[]; onClose: () => void; onCreated: () => void }) {
+function CreateProjectModal({ types, onClose, onCreated }: { types: { value: string; label: string; emoji?: string }[]; onClose: () => void; onCreated: () => void }) {
+  const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     name: '', fermentation_type: 'kombucha' as FermentationType,
     description: '', batch_size_liters: '', initial_gravity: '', initial_ph: '',
-    fermentation_temp_celsius: '', vessel_type: ''
+    fermentation_temp_celsius: '', vessel_type: '', target_end_date: '', notes: ''
   })
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const removePhoto = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
-      await api.post('/projects', {
+      let cover_photo_url: string | undefined
+
+      if (photoFile && user) {
+        const ext = photoFile.name.split('.').pop()
+        const path = `${user.id}/${Date.now()}.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('project-photos')
+          .upload(path, photoFile, { upsert: true })
+        if (uploadError) {
+          toast.error('Photo upload failed — project will be created without a cover photo.')
+        } else {
+          const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(path)
+          cover_photo_url = urlData.publicUrl
+        }
+      }
+
+      await api.post('/projects/', {
         ...form,
+        cover_photo_url,
         start_date: new Date().toISOString(),
         batch_size_liters: form.batch_size_liters ? parseFloat(form.batch_size_liters) : undefined,
         initial_gravity: form.initial_gravity ? parseFloat(form.initial_gravity) : undefined,
         initial_ph: form.initial_ph ? parseFloat(form.initial_ph) : undefined,
         fermentation_temp_celsius: form.fermentation_temp_celsius ? parseFloat(form.fermentation_temp_celsius) : undefined,
+        target_end_date: form.target_end_date || undefined,
+        notes: form.notes || undefined,
       })
       toast.success('Project created! 🫧')
       onCreated()
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to create project')
+      toast.error(err?.message || err?.response?.data?.detail || 'Failed to create project')
     } finally {
       setLoading(false)
     }
@@ -155,34 +197,67 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
         <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>New Fermentation Project</h2>
         <form onSubmit={submit}>
           <div style={{ display: 'grid', gap: '1rem' }}>
+
+            {/* Cover photo */}
+            <Field label="Cover Photo">
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+              {photoPreview ? (
+                <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', height: '140px' }}>
+                  <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button type="button" onClick={removePhoto} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()} style={{ width: '100%', padding: '1.25rem', border: '2px dashed var(--border)', borderRadius: '8px', background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', fontSize: '0.875rem' }}>
+                  <ImagePlus size={16} /> Add a cover photo
+                </button>
+              )}
+            </Field>
+
             <Field label="Project Name *">
               <input required value={form.name} onChange={set('name')} placeholder="My Summer Kombucha" style={iStyle} />
             </Field>
+
             <Field label="Fermentation Type *">
               <select required value={form.fermentation_type} onChange={set('fermentation_type')} style={iStyle}>
-                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {types.map(t => (
+                  <option key={t.value} value={t.value}>
+                    {t.emoji ? `${t.emoji} ${t.label}` : t.label}
+                  </option>
+                ))}
               </select>
             </Field>
+
             <Field label="Description">
-              <textarea value={form.description} onChange={set('description')} placeholder="Notes about this batch..." style={{ ...iStyle, resize: 'vertical', minHeight: '60px' }} />
+              <textarea value={form.description} onChange={set('description')} placeholder="What are you making? Any special ingredients?" style={{ ...iStyle, resize: 'vertical', minHeight: '60px' }} />
             </Field>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Field label="Batch Size (L)">
-                <input type="number" step="0.1" value={form.batch_size_liters} onChange={set('batch_size_liters')} placeholder="3.8" style={iStyle} />
+                <input type="number" step="0.1" min="0" value={form.batch_size_liters} onChange={set('batch_size_liters')} placeholder="3.8" style={iStyle} />
+              </Field>
+              <Field label="Vessel Type">
+                <input value={form.vessel_type} onChange={set('vessel_type')} placeholder="Mason jar, Carboy..." style={iStyle} />
               </Field>
               <Field label="Initial Gravity (OG)">
                 <input type="number" step="0.001" value={form.initial_gravity} onChange={set('initial_gravity')} placeholder="1.054" style={iStyle} />
               </Field>
               <Field label="Initial pH">
-                <input type="number" step="0.1" value={form.initial_ph} onChange={set('initial_ph')} placeholder="7.2" style={iStyle} />
+                <input type="number" step="0.1" min="0" max="14" value={form.initial_ph} onChange={set('initial_ph')} placeholder="7.2" style={iStyle} />
               </Field>
               <Field label="Temp (°C)">
                 <input type="number" step="0.5" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} placeholder="20" style={iStyle} />
               </Field>
+              <Field label="Target End Date">
+                <input type="date" value={form.target_end_date} onChange={set('target_end_date')} style={iStyle} />
+              </Field>
             </div>
-            <Field label="Vessel Type">
-              <input value={form.vessel_type} onChange={set('vessel_type')} placeholder="Mason jar, Carboy, Bucket..." style={iStyle} />
+
+            <Field label="Notes">
+              <textarea value={form.notes} onChange={set('notes')} placeholder="Reminders, sourcing info, anything else..." style={{ ...iStyle, resize: 'vertical', minHeight: '60px' }} />
             </Field>
+
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
             <button type="button" onClick={onClose} style={{ flex: 1, padding: '0.75rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>Cancel</button>

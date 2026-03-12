@@ -160,6 +160,7 @@ class ProjectCreate(BaseModel):
     fermentation_temp_celsius: Optional[float] = None
     vessel_type: Optional[str] = None
     notes: Optional[str] = None
+    cover_photo_url: Optional[str] = None
 
 
 class ProjectUpdate(BaseModel):
