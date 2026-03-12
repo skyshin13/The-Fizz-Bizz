@@ -16,7 +16,7 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showMeasure, setShowMeasure] = useState(false)
   const [showNote, setShowNote] = useState(false)
-  const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'abv' | 'co2'>('ph')
+  const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'co2'>('ph')
   const [activeTab, setActiveTab] = useState<'log' | 'album'>('log')
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const { getEmoji } = useFermentationTypes()
@@ -96,30 +96,75 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Chart */}
-      {chartData.length > 1 && (
+      {chartData.length >= 1 && (
         <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light)', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.1rem' }}>Fermentation Data</h2>
+            <h2 style={{ fontSize: '1.1rem' }}>Fermentation Trends</h2>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {(['ph', 'gravity', 'abv', 'co2'] as const).map(c => (
-                <button key={c} onClick={() => setActiveChart(c)} style={{ padding: '0.3rem 0.75rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 500, background: activeChart === c ? 'var(--amber)' : 'transparent', color: activeChart === c ? 'var(--brown-dark)' : 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  {c.toUpperCase()}
+              {([
+                ['ph',  'pH',  '#4a6741'],
+                ['gravity', 'SG', '#c8832a'],
+                ['co2', 'CO₂', '#3d4e5c'],
+              ] as const).map(([key, label, color]) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveChart(key)}
+                  style={{
+                    padding: '0.3rem 0.875rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 500,
+                    background: activeChart === key ? color : 'transparent',
+                    color: activeChart === key ? '#fff' : 'var(--text-muted)',
+                    border: `1px solid ${activeChart === key ? color : 'var(--border)'}`,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
                 </button>
               ))}
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
-              <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }} />
-              {activeChart === 'ph' && <Line type="monotone" dataKey="ph" stroke="#4a6741" strokeWidth={2.5} dot={{ fill: '#4a6741', r: 4 }} connectNulls />}
-              {activeChart === 'gravity' && <Line type="monotone" dataKey="sg" stroke="#c8832a" strokeWidth={2.5} dot={{ fill: '#c8832a', r: 4 }} connectNulls />}
-              {activeChart === 'abv' && <Line type="monotone" dataKey="abv" stroke="#b54a2c" strokeWidth={2.5} dot={{ fill: '#b54a2c', r: 4 }} connectNulls />}
-              {activeChart === 'co2' && <Line type="monotone" dataKey="co2" stroke="#3d4e5c" strokeWidth={2.5} dot={{ fill: '#3d4e5c', r: 4 }} connectNulls />}
+              <YAxis
+                tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                domain={
+                  activeChart === 'ph' ? [0, 14] :
+                  activeChart === 'gravity' ? ['auto', 'auto'] :
+                  ['auto', 'auto']
+                }
+                tickFormatter={v =>
+                  activeChart === 'gravity' ? v.toFixed(3) : v
+                }
+              />
+              <Tooltip
+                contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }}
+                formatter={(value: number) =>
+                  activeChart === 'ph' ? [`${value} pH`, 'pH'] :
+                  activeChart === 'gravity' ? [value.toFixed(3), 'Specific Gravity'] :
+                  [`${value} psi`, 'CO₂']
+                }
+              />
+              {activeChart === 'ph' && (
+                <Line type="monotone" dataKey="ph" name="pH" stroke="#4a6741" strokeWidth={2.5}
+                  dot={{ fill: '#4a6741', r: 5, strokeWidth: 0 }}
+                  activeDot={{ r: 7 }} connectNulls />
+              )}
+              {activeChart === 'gravity' && (
+                <Line type="monotone" dataKey="sg" name="SG" stroke="#c8832a" strokeWidth={2.5}
+                  dot={{ fill: '#c8832a', r: 5, strokeWidth: 0 }}
+                  activeDot={{ r: 7 }} connectNulls />
+              )}
+              {activeChart === 'co2' && (
+                <Line type="monotone" dataKey="co2" name="CO₂" stroke="#3d4e5c" strokeWidth={2.5}
+                  dot={{ fill: '#3d4e5c', r: 5, strokeWidth: 0 }}
+                  activeDot={{ r: 7 }} connectNulls />
+              )}
             </LineChart>
           </ResponsiveContainer>
+          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
+            {project.measurements.length} reading{project.measurements.length !== 1 ? 's' : ''} logged
+          </p>
         </div>
       )}
 
