@@ -1,16 +1,18 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import {
-  LayoutDashboard, FlaskConical, BookOpen, Dna, Calculator, LogOut, Sparkles
+  LayoutDashboard, FlaskConical, BookOpen, Dna, Calculator, LogOut, Compass, UserCircle
 } from 'lucide-react'
 import styles from './Layout.module.css'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/projects', icon: FlaskConical, label: 'Projects' },
+  { to: '/explore', icon: Compass, label: 'Explore' },
   { to: '/yeasts', icon: Dna, label: 'Yeast Library' },
   { to: '/recipes', icon: BookOpen, label: 'Recipes' },
   { to: '/calculators', icon: Calculator, label: 'Calculators' },
+  { to: '/profile', icon: UserCircle, label: 'Profile & Friends' },
 ]
 
 export default function Layout() {

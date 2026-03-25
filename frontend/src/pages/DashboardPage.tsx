@@ -64,9 +64,6 @@ export default function DashboardPage() {
       <div className="fade-in-delay-2" style={{ marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '1.25rem' }}>Active Ferments</h2>
-          <Link to="/projects/new" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 1rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
-            <Plus size={15} /> New Project
-          </Link>
         </div>
 
         {loading ? (

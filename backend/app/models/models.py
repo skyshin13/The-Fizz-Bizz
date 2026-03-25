@@ -30,6 +30,11 @@ class ProjectStatus(str, enum.Enum):
     PAUSED = "paused"
 
 
+class FriendshipStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -50,6 +55,8 @@ class User(Base):
     yeast_profiles = relationship("YeastProfile", back_populates="creator")
     recipes = relationship("Recipe", back_populates="creator")
     reminders = relationship("Reminder", back_populates="user")
+    sent_requests = relationship("Friendship", foreign_keys="[Friendship.requester_id]", back_populates="requester")
+    received_requests = relationship("Friendship", foreign_keys="[Friendship.receiver_id]", back_populates="receiver")
 
 
 class FermentationProject(Base):
@@ -73,6 +80,7 @@ class FermentationProject(Base):
     vessel_type = Column(String)     # e.g. "mason jar", "carboy", "bucket"
     notes = Column(Text)
     cover_photo_url = Column(String)
+    is_public = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -244,3 +252,17 @@ class RecipeIngredient(Base):
     order_index = Column(Integer, default=0)
 
     recipe = relationship("Recipe", back_populates="ingredients")
+
+
+class Friendship(Base):
+    __tablename__ = "friendships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(SAEnum(FriendshipStatus), default=FriendshipStatus.PENDING)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    requester = relationship("User", foreign_keys=[requester_id], back_populates="sent_requests")
+    receiver = relationship("User", foreign_keys=[receiver_id], back_populates="received_requests")

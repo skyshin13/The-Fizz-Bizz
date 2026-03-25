@@ -9,6 +9,8 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import YeastsPage from './pages/YeastsPage'
 import RecipesPage from './pages/RecipesPage'
 import CalculatorsPage from './pages/CalculatorsPage'
+import ExplorePage from './pages/ExplorePage'
+import ProfilePage from './pages/ProfilePage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -36,6 +38,9 @@ export default function App() {
         <Route path="yeasts" element={<YeastsPage />} />
         <Route path="recipes" element={<RecipesPage />} />
         <Route path="calculators" element={<CalculatorsPage />} />
+        <Route path="explore" element={<ExplorePage />} />
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="profile/:username" element={<ProfilePage />} />
       </Route>
     </Routes>
   )

@@ -161,6 +161,7 @@ class ProjectCreate(BaseModel):
     vessel_type: Optional[str] = None
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None
+    is_public: bool = False
 
 
 class ProjectUpdate(BaseModel):
@@ -170,6 +171,7 @@ class ProjectUpdate(BaseModel):
     final_gravity: Optional[float] = None
     end_date: Optional[datetime] = None
     notes: Optional[str] = None
+    is_public: Optional[bool] = None
 
 
 class ProjectOut(BaseModel):
@@ -190,6 +192,7 @@ class ProjectOut(BaseModel):
     vessel_type: Optional[str] = None
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None
+    is_public: bool = False
     created_at: datetime
     measurements: List[MeasurementOut] = []
     observations: List[ObservationOut] = []
@@ -338,3 +341,54 @@ class CO2ActivityResponse(BaseModel):
     message: str
     slope: Optional[float] = None
     recommendation: str
+
+
+# ─── Social Schemas ───────────────────────────────────────────────────────────
+
+class PublicUserOut(BaseModel):
+    id: int
+    username: str
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    created_at: datetime
+    public_project_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class PublicProjectOut(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    fermentation_type: FermentationType
+    status: ProjectStatus
+    description: Optional[str] = None
+    cover_photo_url: Optional[str] = None
+    created_at: datetime
+    author_username: str
+    author_display_name: Optional[str] = None
+    measurement_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class FriendshipOut(BaseModel):
+    id: int
+    requester_id: int
+    receiver_id: int
+    status: str
+    created_at: datetime
+    friend: PublicUserOut
+
+    class Config:
+        from_attributes = True
+
+
+class PublicUserProfileOut(PublicUserOut):
+    public_projects: List[PublicProjectOut] = []
+    friendship_id: Optional[int] = None
+    friendship_status: Optional[str] = None
+    is_requester: Optional[bool] = None

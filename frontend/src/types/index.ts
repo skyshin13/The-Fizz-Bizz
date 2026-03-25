@@ -85,9 +85,64 @@ export interface Project {
   vessel_type?: string
   notes?: string
   cover_photo_url?: string
+  is_public: boolean
   created_at: string
   measurements: Measurement[]
   observations: Observation[]
+}
+
+export interface PublicUser {
+  id: number
+  username: string
+  display_name?: string
+  bio?: string
+  avatar_url?: string
+  created_at: string
+  public_project_count: number
+}
+
+export interface PublicProject {
+  id: number
+  user_id: number
+  name: string
+  fermentation_type: FermentationType
+  status: ProjectStatus
+  description?: string
+  cover_photo_url?: string
+  created_at: string
+  author_username: string
+  author_display_name?: string
+  measurement_count: number
+}
+
+export interface FriendRequest {
+  id: number
+  requester_id: number
+  receiver_id: number
+  status: 'pending' | 'accepted'
+  created_at: string
+  friend: PublicUser
+}
+
+export interface PublicUserProfile extends PublicUser {
+  public_projects: PublicProject[]
+  friendship_id?: number
+  friendship_status?: 'pending' | 'accepted'
+  is_requester?: boolean
+}
+
+export interface Reminder {
+  id: number
+  project_id: number
+  user_id: number
+  reminder_type: string
+  message: string
+  interval_hours: number
+  next_trigger_at?: string
+  is_active: boolean
+  sms_enabled: boolean
+  phone_number?: string
+  created_at: string
 }
 
 export interface YeastProfile {

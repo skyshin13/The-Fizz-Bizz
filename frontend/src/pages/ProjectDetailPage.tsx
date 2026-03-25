@@ -2,11 +2,11 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
-import { Project } from '../types'
+import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
@@ -18,12 +18,15 @@ export default function ProjectDetailPage() {
   const [showNote, setShowNote] = useState(false)
   const [showComplete, setShowComplete] = useState(false)
   const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'co2'>('ph')
-  const [activeTab, setActiveTab] = useState<'log' | 'album'>('log')
+  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'reminders'>('log')
+  const [reminders, setReminders] = useState<Reminder[]>([])
+  const [showReminder, setShowReminder] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const { getEmoji } = useFermentationTypes()
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
-  useEffect(() => { load() }, [id])
+  const loadReminders = () => api.get(`/projects/${id}/reminders`).then(r => setReminders(r.data)).catch(() => {})
+  useEffect(() => { load(); loadReminders() }, [id])
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center' }}>Loading...</div>
   if (!project) return <div style={{ padding: '3rem', textAlign: 'center' }}>Project not found.</div>
@@ -46,8 +49,8 @@ export default function ProjectDetailPage() {
     ? Math.floor((Date.now() - new Date(project.start_date).getTime()) / 86400000)
     : null
 
-  const ALCOHOL_TYPES = ['beer', 'wine', 'mead', 'cider', 'alcohol_brewing', 'kombucha', 'water_kefir', 'milk_kefir']
-  const isAlcohol = ALCOHOL_TYPES.includes(project.fermentation_type)
+  const ALCOHOL_TYPES = new Set(['beer', 'wine', 'mead', 'cider', 'alcohol_brewing'])
+  const isAlcohol = ALCOHOL_TYPES.has(project.fermentation_type)
 
   const finalAbv = (project.initial_gravity && project.final_gravity)
     ? Math.max(0, (project.initial_gravity - project.final_gravity) * 131.25)
@@ -89,20 +92,25 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Stats row */}
-      <div className="fade-in-delay-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-        {[
+      {(() => {
+        const stats = [
           { label: 'Current pH', value: latestM?.ph?.toFixed(1), icon: Droplets, color: 'var(--moss)' },
-          { label: 'Gravity (SG)', value: latestM?.specific_gravity?.toFixed(3), icon: FlaskConical, color: 'var(--amber)' },
-          {
-            label: project.status === 'completed' && finalAbv !== null ? 'Final ABV' : 'Est. ABV',
-            value: project.status === 'completed' && finalAbv !== null
-              ? `${finalAbv.toFixed(1)}%`
-              : latestM?.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined,
-            icon: Activity,
-            color: 'var(--rust)',
-          },
+          ...(isAlcohol ? [
+            { label: 'Gravity (SG)', value: latestM?.specific_gravity?.toFixed(3), icon: FlaskConical, color: 'var(--amber)' },
+            {
+              label: project.status === 'completed' && finalAbv !== null ? 'Final ABV' : 'Est. ABV',
+              value: project.status === 'completed' && finalAbv !== null
+                ? `${finalAbv.toFixed(1)}%`
+                : latestM?.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined,
+              icon: Activity,
+              color: 'var(--rust)',
+            },
+          ] : []),
           { label: 'Temp (°C)', value: latestM?.temperature_celsius?.toFixed(1), icon: Thermometer, color: 'var(--slate)' },
-        ].map(({ label, value, icon: Icon, color }) => (
+        ]
+        return (
+      <div className="fade-in-delay-1" style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length}, 1fr)`, gap: '1rem', marginBottom: '2rem' }}>
+        {stats.map(({ label, value, icon: Icon, color }) => (
           <div key={label} style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border-light)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
@@ -114,6 +122,8 @@ export default function ProjectDetailPage() {
           </div>
         ))}
       </div>
+        )
+      })()}
 
       {/* Chart */}
       {chartData.length >= 1 && (
@@ -123,7 +133,7 @@ export default function ProjectDetailPage() {
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {([
                 ['ph',  'pH',  '#4a6741'],
-                ['gravity', 'SG', '#c8832a'],
+                ...(isAlcohol ? [['gravity', 'SG', '#c8832a']] : []),
                 ['co2', 'CO₂', '#3d4e5c'],
               ] as const).map(([key, label, color]) => (
                 <button
@@ -191,7 +201,7 @@ export default function ProjectDetailPage() {
       {/* Tabs */}
       <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)' }}>
-          {([['log', 'Notes & Log'], ['album', `Album (${photos.length})`]] as const).map(([tab, label]) => (
+          {([['log', 'Notes & Log'], ['album', `Album (${photos.length})`], ['reminders', `Reminders (${reminders.length})`]] as const).map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
               {label}
             </button>
@@ -235,12 +245,13 @@ export default function ProjectDetailPage() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '320px', overflowY: 'auto' }}>
                   {project.measurements.slice().reverse().map(m => (
-                    <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '90px repeat(4, 1fr)', gap: '0.5rem', padding: '0.625rem', background: 'var(--warm-white)', borderRadius: '6px', fontSize: '0.8rem' }}>
+                    <div key={m.id} style={{ display: 'grid', gridTemplateColumns: isAlcohol ? '90px repeat(4, 1fr)' : '90px repeat(3, 1fr)', gap: '0.5rem', padding: '0.625rem', background: 'var(--warm-white)', borderRadius: '6px', fontSize: '0.8rem' }}>
                       <span style={{ color: 'var(--text-muted)' }}>{format(parseISO(m.logged_at), 'MMM d, yyyy')}</span>
                       <span style={{ color: 'var(--text-secondary)' }}>{m.ph ? `pH ${m.ph}` : '—'}</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{m.specific_gravity ? `SG ${m.specific_gravity}` : '—'}</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{m.alcohol_by_volume ? `${m.alcohol_by_volume.toFixed(1)}%` : '—'}</span>
+                      {isAlcohol && <span style={{ color: 'var(--text-secondary)' }}>{m.specific_gravity ? `SG ${m.specific_gravity}` : '—'}</span>}
+                      {isAlcohol && <span style={{ color: 'var(--text-secondary)' }}>{m.alcohol_by_volume ? `${m.alcohol_by_volume.toFixed(1)}% ABV` : '—'}</span>}
                       <span style={{ color: 'var(--text-secondary)' }}>{m.co2_psi ? `${m.co2_psi} psi` : '—'}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{m.temperature_celsius ? `${m.temperature_celsius}°C` : '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -266,6 +277,48 @@ export default function ProjectDetailPage() {
                       <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{format(parseISO(obs.created_at), 'MMM d, yyyy')}</p>
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'reminders' && (
+          <div style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>SMS Reminders</h2>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Get texted when it's time to check pH or release CO₂.</p>
+              </div>
+              <button
+                onClick={() => setShowReminder(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 0.875rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                <Plus size={14} /> Add Reminder
+              </button>
+            </div>
+            {reminders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', background: 'var(--warm-white)', borderRadius: '10px', border: '2px dashed var(--border)' }}>
+                <Bell size={28} style={{ marginBottom: '0.75rem', opacity: 0.3 }} />
+                <p style={{ fontSize: '0.875rem' }}>No reminders set. Add one to get SMS alerts for pH checks or CO₂ releases.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {reminders.map(r => (
+                  <ReminderCard
+                    key={r.id}
+                    reminder={r}
+                    onDelete={() => {
+                      api.delete(`/reminders/${r.id}`)
+                        .then(() => { toast.success('Reminder deleted'); loadReminders() })
+                        .catch(() => toast.error('Failed to delete reminder'))
+                    }}
+                    onSendNow={() => {
+                      api.post(`/reminders/${r.id}/send`)
+                        .then(() => toast.success('SMS sent!'))
+                        .catch((err) => toast.error(err?.response?.data?.detail || 'Failed to send SMS'))
+                    }}
+                  />
                 ))}
               </div>
             )}
@@ -302,14 +355,15 @@ export default function ProjectDetailPage() {
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
             {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
             {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
-            {project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
+            {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
             {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
           </div>
         </div>
       )}
 
-      {showMeasure && <MeasurementModal projectId={project.id} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
+      {showMeasure && <MeasurementModal projectId={project.id} isAlcohol={isAlcohol} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
       {showNote && <NoteModal projectId={project.id} onClose={() => setShowNote(false)} onAdded={() => { setShowNote(false); load() }} />}
+      {showReminder && <ReminderModal projectId={project.id} onClose={() => setShowReminder(false)} onAdded={() => { setShowReminder(false); loadReminders() }} />}
       {showComplete && (
         <CompleteProjectModal
           project={project}
@@ -331,7 +385,7 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
-function MeasurementModal({ projectId, onClose, onAdded }: { projectId: number; onClose: () => void; onAdded: () => void }) {
+function MeasurementModal({ projectId, isAlcohol, onClose, onAdded }: { projectId: number; isAlcohol: boolean; onClose: () => void; onAdded: () => void }) {
   const [form, setForm] = useState({ specific_gravity: '', ph: '', temperature_celsius: '', co2_psi: '', notes: '' })
   const [loading, setLoading] = useState(false)
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -362,7 +416,7 @@ function MeasurementModal({ projectId, onClose, onAdded }: { projectId: number; 
       <form onSubmit={submit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
           {[
-            { label: 'Specific Gravity', key: 'specific_gravity' as const, placeholder: '1.010', step: '0.001' },
+            ...(isAlcohol ? [{ label: 'Specific Gravity', key: 'specific_gravity' as const, placeholder: '1.010', step: '0.001' }] : []),
             { label: 'pH', key: 'ph' as const, placeholder: '4.5', step: '0.1' },
             { label: 'Temperature (°C)', key: 'temperature_celsius' as const, placeholder: '20.0', step: '0.1' },
             { label: 'CO₂ (PSI)', key: 'co2_psi' as const, placeholder: '6.5', step: '0.1' },
@@ -564,6 +618,190 @@ function CompleteProjectModal({ project, isAlcohol, onClose, onCompleted }: {
             : 'Mark this batch as complete. This will record today as the end date.'}
         </p>
         <ModalFooter onClose={onClose} loading={loading} submitLabel="Complete Project" />
+      </form>
+    </Modal>
+  )
+}
+
+function ReminderCard({ reminder, onDelete, onSendNow }: { reminder: Reminder; onDelete: () => void; onSendNow: () => void }) {
+  const typeLabels: Record<string, string> = {
+    ph_check: '🧪 pH Check',
+    co2_release: '💨 CO₂ Release',
+    gravity_check: '⚗️ Gravity Check',
+    taste: '👅 Taste Test',
+    custom: '⏰ Custom',
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem', padding: '1rem 1.125rem', background: reminder.is_active ? 'var(--card-bg)' : 'var(--warm-white)', borderRadius: '10px', border: `1px solid ${reminder.is_active ? 'var(--border-light)' : 'var(--border)'}` }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{typeLabels[reminder.reminder_type] || reminder.reminder_type}</span>
+          {reminder.sms_enabled ? (
+            <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: 3 }}>
+              <Bell size={10} /> SMS on
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: 'var(--parchment)', color: 'var(--text-muted)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: 3 }}>
+              <BellOff size={10} /> SMS off
+            </span>
+          )}
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>{reminder.message}</p>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Every {reminder.interval_hours}h
+          {reminder.next_trigger_at && ` · Next: ${format(parseISO(reminder.next_trigger_at), 'MMM d, h:mm a')}`}
+          {reminder.phone_number && ` · ${reminder.phone_number}`}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
+        {reminder.sms_enabled && (
+          <button
+            onClick={onSendNow}
+            title="Send SMS now"
+            style={{ padding: '0.375rem 0.625rem', background: 'var(--parchment)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
+          >
+            <Send size={12} /> Send
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          title="Delete reminder"
+          style={{ padding: '0.375rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)' }}
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ReminderModal({ projectId, onClose, onAdded }: { projectId: number; onClose: () => void; onAdded: () => void }) {
+  const { user } = useAuth()
+  const [form, setForm] = useState({
+    reminder_type: 'ph_check',
+    interval_hours: '48',
+    phone_number: user?.phone_number || '',
+    sms_enabled: !!(user?.phone_number && user?.sms_notifications_enabled),
+    message: '',
+  })
+  const [loading, setLoading] = useState(false)
+
+  const PRESET_TYPES = [
+    { value: 'ph_check', label: '🧪 pH Check', defaultMsg: 'Time to check the pH on your fermentation!', defaultHours: '48' },
+    { value: 'co2_release', label: '💨 CO₂ Release (Burp)', defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!', defaultHours: '24' },
+    { value: 'gravity_check', label: '⚗️ Gravity Check', defaultMsg: 'Time to take a gravity reading!', defaultHours: '72' },
+    { value: 'taste', label: '👅 Taste Test', defaultMsg: 'Time for a taste test on your fermentation!', defaultHours: '96' },
+    { value: 'custom', label: '⏰ Custom', defaultMsg: '', defaultHours: '48' },
+  ]
+
+  const selectPreset = (value: string) => {
+    const preset = PRESET_TYPES.find(p => p.value === value)!
+    setForm(prev => ({ ...prev, reminder_type: value, message: preset.defaultMsg, interval_hours: preset.defaultHours }))
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      await api.post(`/projects/${projectId}/reminders`, {
+        reminder_type: form.reminder_type,
+        message: form.message,
+        interval_hours: parseInt(form.interval_hours),
+        sms_enabled: form.sms_enabled,
+        phone_number: form.phone_number || undefined,
+      })
+      toast.success('Reminder created!')
+      onAdded()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to create reminder')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="Add Reminder" onClose={onClose}>
+      <form onSubmit={submit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lStyle}>Reminder Type</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {PRESET_TYPES.map(p => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => selectPreset(p.value)}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: form.reminder_type === p.value ? 600 : 400,
+                  background: form.reminder_type === p.value ? 'var(--amber-glow)' : 'var(--warm-white)',
+                  border: `1px solid ${form.reminder_type === p.value ? 'var(--amber)' : 'var(--border)'}`,
+                  color: form.reminder_type === p.value ? 'var(--brown-dark)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lStyle}>Message</label>
+          <textarea
+            value={form.message}
+            onChange={e => setForm(prev => ({ ...prev, message: e.target.value }))}
+            placeholder="What should the reminder say?"
+            required
+            style={{ ...iStyle, resize: 'vertical', minHeight: '60px' }}
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lStyle}>Repeat Every (hours)</label>
+          <input
+            type="number"
+            min="1"
+            value={form.interval_hours}
+            onChange={e => setForm(prev => ({ ...prev, interval_hours: e.target.value }))}
+            style={iStyle}
+          />
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+            e.g. 24 = daily, 48 = every 2 days
+          </p>
+        </div>
+        <div style={{ marginBottom: '1rem', padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: form.sms_enabled ? '0.875rem' : 0 }}>
+            <input
+              type="checkbox"
+              id="sms_enable"
+              checked={form.sms_enabled}
+              onChange={e => setForm(prev => ({ ...prev, sms_enabled: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
+            />
+            <label htmlFor="sms_enable" style={{ fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Bell size={13} color="var(--moss)" /> Send as SMS text message
+            </label>
+          </div>
+          {form.sms_enabled && (
+            <div>
+              <label style={lStyle}>Phone Number</label>
+              <input
+                type="tel"
+                value={form.phone_number}
+                onChange={e => setForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                placeholder="+1 555 000 0000"
+                style={iStyle}
+              />
+              {!user?.phone_number && (
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  Tip: save your phone number in your profile to pre-fill this automatically.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <ModalFooter onClose={onClose} loading={loading} submitLabel="Create Reminder" />
       </form>
     </Modal>
   )

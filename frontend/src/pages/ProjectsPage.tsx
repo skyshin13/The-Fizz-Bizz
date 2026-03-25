@@ -6,7 +6,7 @@ import { Project, FermentationType } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, Search, Clock, Trash2, ImagePlus, X } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function ProjectsPage() {
@@ -114,6 +114,9 @@ function ProjectRow({ project, onDelete, getEmoji }: { project: Project; onDelet
           <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '20px', background: project.status === 'active' ? '#4a674118' : '#3d4e5c18', color: project.status === 'active' ? 'var(--moss)' : 'var(--slate)' }}>
             {project.status}
           </span>
+          <span title={project.is_public ? 'Public' : 'Private'} style={{ display: 'flex', alignItems: 'center', color: project.is_public ? 'var(--moss)' : 'var(--text-muted)' }}>
+            {project.is_public ? <Globe size={12} /> : <Lock size={12} />}
+          </span>
           <button onClick={e => { e.preventDefault(); onDelete() }} style={{ padding: 4, background: 'transparent', color: 'var(--text-muted)', borderRadius: 4 }}>
             <Trash2 size={13} />
           </button>
@@ -129,7 +132,8 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
   const [form, setForm] = useState({
     name: '', fermentation_type: 'kombucha' as FermentationType,
     description: '', batch_size_liters: '', initial_gravity: '', initial_ph: '',
-    fermentation_temp_celsius: '', vessel_type: '', target_end_date: '', notes: ''
+    fermentation_temp_celsius: '', vessel_type: '', target_end_date: '', notes: '',
+    is_public: false,
   })
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -137,6 +141,9 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const ALCOHOL_TYPES = new Set(['beer', 'wine', 'mead', 'cider', 'alcohol_brewing'])
+  const isAlcohol = ALCOHOL_TYPES.has(form.fermentation_type)
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -240,9 +247,11 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
               <Field label="Vessel Type">
                 <input value={form.vessel_type} onChange={set('vessel_type')} placeholder="Mason jar, Carboy..." style={iStyle} />
               </Field>
-              <Field label="Initial Gravity (OG)">
-                <input type="number" step="0.001" value={form.initial_gravity} onChange={set('initial_gravity')} placeholder="1.054" style={iStyle} />
-              </Field>
+              {isAlcohol && (
+                <Field label="Initial Gravity (OG)">
+                  <input type="number" step="0.001" value={form.initial_gravity} onChange={set('initial_gravity')} placeholder="1.054" style={iStyle} />
+                </Field>
+              )}
               <Field label="Initial pH">
                 <input type="number" step="0.1" min="0" max="14" value={form.initial_ph} onChange={set('initial_ph')} placeholder="7.2" style={iStyle} />
               </Field>
@@ -257,6 +266,19 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
             <Field label="Notes">
               <textarea value={form.notes} onChange={set('notes')} placeholder="Reminders, sourcing info, anything else..." style={{ ...iStyle, resize: 'vertical', minHeight: '60px' }} />
             </Field>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer', padding: '0.75rem', background: form.is_public ? '#4a674112' : 'transparent', borderRadius: '8px', border: `1px solid ${form.is_public ? 'var(--moss-light)' : 'var(--border)'}`, transition: 'all 0.2s' }}>
+              <input
+                type="checkbox"
+                checked={form.is_public}
+                onChange={e => setForm(prev => ({ ...prev, is_public: e.target.checked }))}
+                style={{ width: 16, height: 16, accentColor: 'var(--moss)', flexShrink: 0 }}
+              />
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Make this project public</div>
+                <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>Public projects appear in the Explore feed for others to discover</div>
+              </div>
+            </label>
 
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
