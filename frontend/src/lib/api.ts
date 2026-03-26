@@ -15,13 +15,16 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
-// Auto-logout on 401
+// Auto-logout on 401 only when the Supabase session is truly gone
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     if (err.response?.status === 401) {
-      await supabase.auth.signOut()
-      window.location.href = '/login'
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        await supabase.auth.signOut()
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }

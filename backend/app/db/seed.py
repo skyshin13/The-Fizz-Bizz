@@ -31,7 +31,7 @@ def seed():
         FermentationTypeConfig(value="mead", label="Mead", emoji="🍯", color="#d4a017", description="Honey-based alcoholic fermentation", sort_order=4),
         FermentationTypeConfig(value="cider", label="Cider", emoji="🍎", color="#c84e00", description="Apple or pear-based alcoholic fermentation", sort_order=5),
         FermentationTypeConfig(value="kimchi", label="Kimchi", emoji="🌶️", color="#c0392b", description="Lacto-fermented Korean vegetables", sort_order=6),
-        FermentationTypeConfig(value="lacto_fermentation", label="Lacto-Fermentation", emoji="🥒", color="#5a8a3c", description="Salt-brine vegetable fermentation", sort_order=7),
+        FermentationTypeConfig(value="lacto_fermentation", label="Lacto-Fermentation", emoji="🧂", color="#5a8a3c", description="Salt-brine vegetable fermentation", sort_order=7),
         FermentationTypeConfig(value="water_kefir", label="Water Kefir", emoji="💧", color="#2980b9", description="Probiotic fermented sugar water", sort_order=8),
         FermentationTypeConfig(value="milk_kefir", label="Milk Kefir", emoji="🥛", color="#a0a0a0", description="Probiotic fermented dairy drink", sort_order=9),
         FermentationTypeConfig(value="alcohol_brewing", label="Alcohol Brewing", emoji="🍺", color="#b8860b", description="General alcohol fermentation", sort_order=10),
