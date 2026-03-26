@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../lib/api'
 import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { Calculator, FlaskConical, Zap, Wind, AlertTriangle, Search } from 'lucide-react'
+import { Calculator, FlaskConical, Zap, Wind, AlertTriangle, Search, Info } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend,
 } from 'recharts'
@@ -271,6 +271,7 @@ function CERCalculator() {
   const [displayedPoints, setDisplayedPoints] = useState<CERPoint[]>([])
   const [animating, setAnimating] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
   const animRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -457,6 +458,45 @@ function CERCalculator() {
 
           {/* Chart */}
           <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light)', flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CO₂ Evolution Rate</span>
+              <button
+                onClick={() => setShowInfo(v => !v)}
+                title="How is this calculated?"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.3rem 0.625rem', borderRadius: 20, border: `1px solid ${showInfo ? 'var(--amber)' : 'var(--border)'}`, background: showInfo ? '#f59e0b18' : 'transparent', color: showInfo ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <Info size={12} /> How is this calculated?
+              </button>
+            </div>
+
+            {showInfo && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--parchment)', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>How CO₂ Evolution Rate is calculated</strong>
+                <p style={{ margin: '0.5rem 0 0.25rem' }}>
+                  The graph models the <strong>CO₂ Evolution Rate (CER)</strong> using this formula:
+                </p>
+                <div style={{ fontFamily: 'monospace', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.5rem 0.75rem', margin: '0.5rem 0', fontSize: '0.8rem', color: 'var(--amber)' }}>
+                  CER(t) = μ(t) × X(t) × 0.49 × 1000 &nbsp;[mg CO₂/L/h]
+                </div>
+                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <li><strong>μ(t)</strong> — specific growth rate of yeast at time t, adjusted for your temperature (bell-curve response vs. strain min/opt/max), sugar availability (Monod kinetics), and ethanol inhibition</li>
+                  <li><strong>X(t)</strong> — estimated yeast biomass (g/L) at time t</li>
+                  <li><strong>0.49</strong> — CO₂ yield coefficient: ~0.49 g of CO₂ is produced per gram of new biomass</li>
+                  <li><strong>× 1000</strong> — converts g/L/h → mg/L/h</li>
+                </ul>
+                <p style={{ margin: '0.75rem 0 0.25rem' }}><strong>Growth phases</strong></p>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <li><span style={{ color: '#94a3b8' }}>●</span> <strong>Lag</strong> — yeast adapts to the environment; little to no CO₂ produced</li>
+                  <li><span style={{ color: '#f59e0b' }}>●</span> <strong>Exponential</strong> — rapid growth; CO₂ spikes quickly toward peak</li>
+                  <li><span style={{ color: '#10b981' }}>●</span> <strong>Stationary</strong> — sugars depleted; CO₂ levels off at max</li>
+                  <li><span style={{ color: '#ef4444' }}>●</span> <strong>Decline</strong> — yeast dies off; CO₂ drops toward zero</li>
+                </ul>
+                <p style={{ margin: '0.75rem 0 0', color: 'var(--text-muted)' }}>
+                  Strain-specific parameters (growth rates, temperature tolerances, ethanol limits) are sourced from published yeast kinetic data and updated per selected strain.
+                </p>
+              </div>
+            )}
+
             {chartData.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--text-muted)', gap: '0.75rem' }}>
                 <Wind size={36} style={{ opacity: 0.2 }} />

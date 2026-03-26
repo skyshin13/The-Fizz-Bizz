@@ -317,6 +317,43 @@ def seed():
         ts = now - timedelta(days=4-i)
         db.add(MeasurementLog(project_id=project4.id, logged_at=ts, ph=ph, temperature_celsius=18))
 
+    # ── Live Demo Beer Project ─────────────────────────────────────────────────
+    project5 = FermentationProject(
+        user_id=user.id,
+        name="Hazy IPA — Live Batch",
+        fermentation_type=FermentationType.BEER,
+        status=ProjectStatus.ACTIVE,
+        description="A juicy New England-style IPA loaded with Citra and Mosaic hops. Pitched US-05 at high krausen temperatures for a soft, hazy finish. This batch is actively fermenting — CO₂ data updates live.",
+        batch_size_liters=19.0,
+        start_date=now - timedelta(hours=2),
+        target_end_date=now + timedelta(days=12),
+        initial_gravity=1.062,
+        initial_ph=5.3,
+        fermentation_temp_celsius=20,
+        vessel_type="6.5-gallon glass carboy",
+    )
+    db.add(project5)
+    db.flush()
+
+    # Two early measurements — just pitched
+    db.add(MeasurementLog(
+        project_id=project5.id,
+        logged_at=now - timedelta(hours=2),
+        specific_gravity=1.062, ph=5.3, temperature_celsius=20.0, co2_psi=0.0
+    ))
+    db.add(MeasurementLog(
+        project_id=project5.id,
+        logged_at=now - timedelta(hours=1),
+        specific_gravity=1.061, ph=5.3, temperature_celsius=20.1, co2_psi=0.2
+    ))
+
+    db.add(ObservationNote(
+        project_id=project5.id, user_id=user.id,
+        content="Brew day complete. OG landed at 1.062 — right on target. Pitched US-05 dry into the carboy. Watching the CO₂ curve closely.",
+        tags=["brew-day", "gravity"],
+        created_at=now - timedelta(hours=2)
+    ))
+
     db.commit()
     db.close()
     print("Database seeded successfully!")

@@ -95,7 +95,7 @@ class MeasurementOut(MeasurementCreate):
 # ─── Observation Schemas ──────────────────────────────────────────────────────
 
 class ObservationCreate(BaseModel):
-    content: str
+    content: str = ""
     tags: Optional[List[str]] = None
     photo_url: Optional[str] = None
 

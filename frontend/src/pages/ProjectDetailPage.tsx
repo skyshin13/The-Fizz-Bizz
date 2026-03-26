@@ -6,7 +6,7 @@ import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
@@ -144,6 +144,27 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* About this batch */}
+      {project.description && (
+        <div className="fade-in-delay-1" style={{ marginBottom: '1.5rem', background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)' }}>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{project.description}</p>
+          {(project.batch_size_liters || project.vessel_type || project.fermentation_temp_celsius || project.yeast_strain) && (
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
+              {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
+              {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
+              {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
+              {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
+              {project.yeast_strain && (
+                <Detail
+                  label="Yeast Strain"
+                  value={`${project.yeast_strain.name}${project.yeast_strain.strain_code ? ` (${project.yeast_strain.strain_code})` : ''}${project.yeast_strain.brand ? ` · ${project.yeast_strain.brand}` : ''}`}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats row */}
       {(() => {
@@ -373,8 +394,8 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* Project info */}
-      {project.description && (
+      {/* Project info — moved to bottom placeholder, now rendered near top */}
+      {false && project.description && (
         <div style={{ marginTop: '1.5rem', background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light)' }}>
           <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>About this batch</h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>{project.description}</p>
@@ -493,7 +514,6 @@ function NoteModal({ projectId, onClose, onAdded }: { projectId: number; onClose
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!content.trim()) return
     setLoading(true)
     try {
       let photo_url: string | undefined
@@ -694,8 +714,10 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
 
   const [result, setResult]       = useState<CERResult | null>(null)
   const [displayed, setDisplayed] = useState<CERPoint[]>([])
-  const [animating, setAnimating] = useState(false)
   const [loading, setLoading]     = useState(false)
+  const [showInfo, setShowInfo]   = useState(false)
+  const [liveMode, setLiveMode]   = useState(false)
+  const [liveIdx, setLiveIdx]     = useState(0)
   const animRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Duration = hours since project start, minimum 48h, maximum 240h
@@ -715,13 +737,11 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
       alert_threshold: parseFloat(threshold) || 150,
     }).then(res => {
       const data: CERResult = res.data
-      setResult(data); setAnimating(true)
-      let idx = 0
-      animRef.current = setInterval(() => {
-        idx += 3
-        if (idx >= data.points.length) { idx = data.points.length; clearInterval(animRef.current!); setAnimating(false) }
-        setDisplayed(data.points.slice(0, idx))
-      }, 30)
+      setResult(data)
+      // Start live mode from index 0 — graph builds point by point every 10 min
+      setLiveIdx(1)
+      setDisplayed([])
+      setLiveMode(true)
     }).catch(() => toast.error('Could not load CO₂ data'))
     .finally(() => setLoading(false))
   }
@@ -737,6 +757,38 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
       if (match) { setSelectedStrain(match); run(match, sugar, volume, temp) }
     }).catch(() => {})
   }, [])
+
+  // Live mode: advance one data point every 10 minutes
+  useEffect(() => {
+    if (!liveMode || !result) return
+    if (liveIdx >= result.points.length) { setLiveMode(false); return }
+    const t = setTimeout(() => setLiveIdx(i => i + 1), 10 * 60 * 1000)
+    return () => clearTimeout(t)
+  }, [liveMode, liveIdx, result])
+
+  // Sync displayed with liveIdx while live
+  useEffect(() => {
+    if (liveMode && result) setDisplayed(result.points.slice(0, liveIdx))
+  }, [liveMode, liveIdx, result])
+
+  const startLive = (data: CERResult) => {
+    if (animRef.current) clearInterval(animRef.current)
+    setLiveIdx(1)
+    setDisplayed([])
+    setLiveMode(true)
+  }
+
+  const stopLive = () => {
+    setLiveMode(false)
+    if (result) setDisplayed(result.points)
+  }
+
+  const releaseCO2 = () => {
+    if (animRef.current) clearInterval(animRef.current)
+    setLiveIdx(1)
+    setDisplayed([])
+    setLiveMode(true)
+  }
 
   // Re-run when user changes inputs (debounced via blur)
   const rerun = () => { if (selectedStrain) run(selectedStrain, sugar, volume, temp) }
@@ -803,6 +855,18 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
           <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} onBlur={rerun} style={cerInput} />
         </div>
 
+        {result && (
+          <button
+            onClick={releaseCO2}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #b54a2c60', background: '#b54a2c14', color: 'var(--rust)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#b54a2c25' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#b54a2c14' }}
+          >
+            <Wind size={14} />
+            Release CO₂
+          </button>
+        )}
+
         <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
           Showing {durationHours}h window · Updates on input change
         </p>
@@ -810,27 +874,81 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
 
       {/* Chart + stats */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {result?.alert_triggered && (
+        {displayed.some(p => p.cer > alertNum) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem 1rem', background: '#b54a2c18', border: '1px solid #b54a2c50', borderRadius: '10px', color: 'var(--rust)' }}>
             <AlertTriangle size={16} style={{ flexShrink: 0 }} />
             <div>
               <strong style={{ fontSize: '0.875rem' }}>Pressure Alert</strong>
-              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>CER exceeded {threshold} mg/L/h at <strong>{result.alert_t}h</strong>. Release pressure from your jar.</p>
+              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>CER has exceeded {threshold} mg/L/h. Release pressure from your jar.</p>
             </div>
           </div>
         )}
 
-        <div style={{ background: 'var(--warm-white)', borderRadius: '10px', padding: '1rem', border: '1px solid var(--border-light)' }}>
-          {displayed.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem' }}>
-              <Wind size={30} style={{ opacity: 0.2 }} />
-              <p style={{ fontSize: '0.8rem' }}>{loading ? 'Calculating…' : 'Loading CO₂ data…'}</p>
+        <style>{`@keyframes cer-live-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+        <div style={{ background: 'var(--warm-white)', borderRadius: '10px', padding: '1rem', border: `1px solid ${liveMode ? '#ef444440' : 'var(--border-light)'}`, transition: 'border-color 0.3s' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CO₂ Evolution Rate</span>
+              {liveMode && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', fontWeight: 700, color: '#ef4444', background: '#ef444415', border: '1px solid #ef444440', borderRadius: 20, padding: '0.1rem 0.45rem' }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'cer-live-pulse 1.4s ease-in-out infinite' }} />
+                  LIVE
+                </span>
+              )}
+              {liveMode && result && (
+                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                  Hour {result.points[Math.min(liveIdx, result.points.length - 1)]?.t.toFixed(1) ?? 0} of {result.points.at(-1)?.t ?? 0}h
+                </span>
+              )}
             </div>
-          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              {result && (
+                <button
+                  onClick={() => liveMode ? stopLive() : startLive(result)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.625rem', borderRadius: 20, border: `1px solid ${liveMode ? '#ef444450' : 'var(--amber)'}`, background: liveMode ? '#ef444412' : '#f59e0b15', color: liveMode ? '#ef4444' : 'var(--amber)', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+                >
+                  {liveMode ? '⏹ Exit Live' : '▶ Go Live'}
+                </button>
+              )}
+              <button
+                onClick={() => setShowInfo(v => !v)}
+                title="How is this calculated?"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 20, border: `1px solid ${showInfo ? 'var(--amber)' : 'var(--border)'}`, background: showInfo ? '#f59e0b18' : 'transparent', color: showInfo ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <Info size={11} /> How is this calculated?
+              </button>
+            </div>
+          </div>
+
+          {showInfo && (
+            <div style={{ marginBottom: '0.875rem', padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+              <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>How CO₂ Evolution Rate is calculated</strong>
+              <p style={{ margin: '0.4rem 0 0.2rem' }}>The graph models CER using:</p>
+              <div style={{ fontFamily: 'monospace', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 0.625rem', margin: '0.4rem 0', fontSize: '0.75rem', color: 'var(--amber)' }}>
+                CER(t) = μ(t) × X(t) × 0.49 × 1000 &nbsp;[mg CO₂/L/h]
+              </div>
+              <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                <li><strong>μ(t)</strong> — yeast growth rate, adjusted for temperature (bell-curve vs. strain range), sugar (Monod kinetics), and ethanol inhibition</li>
+                <li><strong>X(t)</strong> — estimated yeast biomass g/L at time t</li>
+                <li><strong>0.49</strong> — CO₂ yield coefficient (g CO₂ per g biomass)</li>
+              </ul>
+              <p style={{ margin: '0.6rem 0 0.2rem' }}><strong>Phases: </strong>
+                <span style={{ color: '#94a3b8' }}>Lag</span> → <span style={{ color: '#f59e0b' }}>Exponential</span> → <span style={{ color: '#10b981' }}>Stationary</span> → <span style={{ color: '#ef4444' }}>Decline</span>
+              </p>
+            </div>
+          )}
+
+          {loading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem' }}>
+              <Wind size={30} style={{ opacity: 0.2 }} />
+              <p style={{ fontSize: '0.8rem' }}>Calculating…</p>
+            </div>
+          )}
+          {!loading && (
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={displayed} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="t" tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'Time (h)', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} tickCount={8} />
+                <XAxis dataKey="t" tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'Time (h)', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} tickCount={8} domain={[0, displayed.length > 0 ? displayed.at(-1)!.t : 2]} type="number" />
                 <YAxis tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'CER (mg/L/h)', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} />
                 <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }} formatter={(v: number) => [`${v.toFixed(2)} mg/L/h`, 'CER']} labelFormatter={(t: number) => `Hour ${t}`} />
                 <ReferenceLine y={alertNum} stroke="var(--rust)" strokeDasharray="5 3" label={{ value: `Alert ${alertNum}`, position: 'insideTopRight', style: { fontSize: '0.65rem', fill: 'var(--rust)' } }} />
