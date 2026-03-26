@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.database import get_db
-from app.models.models import FermentationProject, MeasurementLog, ObservationNote, User
+from app.models.models import FermentationProject, MeasurementLog, ObservationNote, User, ProjectYeastConnection, YeastProfile
 from app.schemas.schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
     MeasurementCreate, MeasurementOut,
@@ -14,15 +14,42 @@ from app.services.calculations import calculate_abv
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
+def _attach_yeast_strain(project, db):
+    """Populate the transient yeast_strain attribute from ProjectYeastConnection."""
+    conn = (
+        db.query(ProjectYeastConnection)
+        .filter_by(project_id=project.id)
+        .first()
+    )
+    if conn:
+        yeast = db.query(YeastProfile).filter_by(id=conn.yeast_id).first()
+        if yeast:
+            project.yeast_strain = type('ProjectYeastOut', (), {
+                'yeast_id': yeast.id,
+                'name': yeast.name,
+                'strain_code': yeast.strain_code,
+                'brand': yeast.brand,
+                'yeast_type': yeast.yeast_type,
+            })()
+        else:
+            project.yeast_strain = None
+    else:
+        project.yeast_strain = None
+    return project
+
+
 @router.get("/", response_model=List[ProjectOut])
 def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return (
+    projects = (
         db.query(FermentationProject)
         .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.observations))
         .filter(FermentationProject.user_id == current_user.id)
         .order_by(FermentationProject.created_at.desc())
         .all()
     )
+    for p in projects:
+        _attach_yeast_strain(p, db)
+    return projects
 
 
 @router.post("/", response_model=ProjectOut, status_code=201)
@@ -31,10 +58,17 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    project = FermentationProject(**body.model_dump(), user_id=current_user.id)
+    data = body.model_dump()
+    yeast_id = data.pop('yeast_id', None)
+    project = FermentationProject(**data, user_id=current_user.id)
     db.add(project)
     db.commit()
     db.refresh(project)
+    if yeast_id:
+        conn = ProjectYeastConnection(project_id=project.id, yeast_id=yeast_id)
+        db.add(conn)
+        db.commit()
+    _attach_yeast_strain(project, db)
     return project
 
 
@@ -52,6 +86,7 @@ def get_project(
     )
     if not project:
         raise HTTPException(404, "Project not found")
+    _attach_yeast_strain(project, db)
     return project
 
 
@@ -72,6 +107,7 @@ def update_project(
         setattr(project, field, value)
     db.commit()
     db.refresh(project)
+    _attach_yeast_strain(project, db)
     return project
 
 

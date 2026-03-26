@@ -67,6 +67,14 @@ export interface Observation {
   created_at: string
 }
 
+export interface ProjectYeastStrain {
+  yeast_id: number
+  name: string
+  strain_code?: string
+  brand?: string
+  yeast_type?: string
+}
+
 export interface Project {
   id: number
   user_id: number
@@ -89,6 +97,7 @@ export interface Project {
   created_at: string
   measurements: Measurement[]
   observations: Observation[]
+  yeast_strain?: ProjectYeastStrain
 }
 
 export interface PublicUser {

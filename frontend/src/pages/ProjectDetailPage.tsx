@@ -403,6 +403,12 @@ export default function ProjectDetailPage() {
             {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
             {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
             {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
+            {project.yeast_strain && (
+              <Detail
+                label="Yeast Strain"
+                value={`${project.yeast_strain.name}${project.yeast_strain.strain_code ? ` (${project.yeast_strain.strain_code})` : ''}${project.yeast_strain.brand ? ` · ${project.yeast_strain.brand}` : ''}`}
+              />
+            )}
           </div>
         </div>
       )}

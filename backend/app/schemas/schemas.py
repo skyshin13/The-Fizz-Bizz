@@ -147,6 +147,17 @@ class ReminderOut(ReminderCreate):
 
 # ─── Project Schemas ──────────────────────────────────────────────────────────
 
+class ProjectYeastOut(BaseModel):
+    yeast_id: int
+    name: str
+    strain_code: Optional[str] = None
+    brand: Optional[str] = None
+    yeast_type: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ProjectCreate(BaseModel):
     name: str
     fermentation_type: FermentationType
@@ -162,6 +173,7 @@ class ProjectCreate(BaseModel):
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None
     is_public: bool = False
+    yeast_id: Optional[int] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -196,6 +208,7 @@ class ProjectOut(BaseModel):
     created_at: datetime
     measurements: List[MeasurementOut] = []
     observations: List[ObservationOut] = []
+    yeast_strain: Optional[ProjectYeastOut] = None
 
     class Config:
         from_attributes = True

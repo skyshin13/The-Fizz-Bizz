@@ -6,7 +6,7 @@ import { Project, FermentationType } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Dna } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function ProjectsPage() {
@@ -135,6 +135,8 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
     fermentation_temp_celsius: '', vessel_type: '', target_end_date: '', notes: '',
     is_public: false,
   })
+  const [yeastId, setYeastId] = useState<string>('')
+  const [yeasts, setYeasts] = useState<{ id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string }[]>([])
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -144,6 +146,10 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
 
   const ALCOHOL_TYPES = new Set(['beer', 'wine', 'mead', 'cider', 'alcohol_brewing'])
   const isAlcohol = ALCOHOL_TYPES.has(form.fermentation_type)
+
+  useEffect(() => {
+    api.get('/yeasts').then(r => setYeasts(r.data)).catch(() => {})
+  }, [])
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -188,6 +194,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
         fermentation_temp_celsius: form.fermentation_temp_celsius ? parseFloat(form.fermentation_temp_celsius) : undefined,
         target_end_date: form.target_end_date || undefined,
         notes: form.notes || undefined,
+        yeast_id: isAlcohol && yeastId ? parseInt(yeastId) : undefined,
       })
       toast.success('Project created! 🫧')
       onCreated()
@@ -250,6 +257,33 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
               {isAlcohol && (
                 <Field label="Initial Gravity (OG)">
                   <input type="number" step="0.001" value={form.initial_gravity} onChange={set('initial_gravity')} placeholder="1.054" style={iStyle} />
+                </Field>
+              )}
+              {isAlcohol && (
+                <Field label="Yeast Strain">
+                  <select value={yeastId} onChange={e => setYeastId(e.target.value)} style={iStyle}>
+                    <option value="">— Select a strain (optional) —</option>
+                    {yeasts.filter(y => ['ale', 'lager', 'wine'].includes(y.yeast_type || '')).map(y => (
+                      <option key={y.id} value={y.id}>
+                        {y.name}{y.strain_code ? ` (${y.strain_code})` : ''}{y.brand ? ` · ${y.brand}` : ''}
+                      </option>
+                    ))}
+                    {yeasts.filter(y => !['ale', 'lager', 'wine'].includes(y.yeast_type || '')).length > 0 && (
+                      <>
+                        <option disabled>──────────</option>
+                        {yeasts.filter(y => !['ale', 'lager', 'wine'].includes(y.yeast_type || '')).map(y => (
+                          <option key={y.id} value={y.id}>
+                            {y.name}{y.strain_code ? ` (${y.strain_code})` : ''}{y.brand ? ` · ${y.brand}` : ''}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                  {yeasts.length === 0 && (
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Dna size={11} /> No strains in library yet — add them in the Yeast Library.
+                    </p>
+                  )}
                 </Field>
               )}
               <Field label="Initial pH">
