@@ -1,23 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api from '../lib/api'
 import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { Calculator, FlaskConical, Zap } from 'lucide-react'
+import { Calculator, FlaskConical, Zap, Wind, AlertTriangle, Search } from 'lucide-react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend,
+} from 'recharts'
+
+type Tab = 'abv' | 'priming' | 'cer'
 
 export default function CalculatorsPage() {
-  const [activeTab, setActiveTab] = useState<'abv' | 'priming'>('abv')
+  const [activeTab, setActiveTab] = useState<Tab>('abv')
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '2.5rem', maxWidth: '900px', margin: '0 auto' }}>
       <div className="fade-in" style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Fermentation Calculators</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Mathematical tools for precise fermentation management.</p>
       </div>
 
-      <div className="fade-in-delay-1" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
+      <div className="fade-in-delay-1" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         {[
-          { id: 'abv' as const, label: 'ABV Calculator', icon: FlaskConical },
-          { id: 'priming' as const, label: 'Priming Sugar', icon: Calculator },
+          { id: 'abv' as const,    label: 'ABV Calculator',    icon: FlaskConical },
+          { id: 'priming' as const, label: 'Priming Sugar',    icon: Calculator },
+          { id: 'cer' as const,    label: 'CO2 Production',    icon: Wind },
         ].map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setActiveTab(id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', borderRadius: '10px', fontSize: '0.875rem', fontWeight: 500, background: activeTab === id ? 'var(--brown-dark)' : 'var(--card-bg)', color: activeTab === id ? 'var(--amber-glow)' : 'var(--text-secondary)', border: '1px solid var(--border)', transition: 'all 0.2s' }}>
             <Icon size={15} /> {label}
@@ -26,11 +32,15 @@ export default function CalculatorsPage() {
       </div>
 
       <div className="fade-in-delay-2">
-        {activeTab === 'abv' ? <ABVCalculator /> : <PrimingSugarCalculator />}
+        {activeTab === 'abv'    && <ABVCalculator />}
+        {activeTab === 'priming' && <PrimingSugarCalculator />}
+        {activeTab === 'cer'    && <CERCalculator />}
       </div>
     </div>
   )
 }
+
+// ─── ABV Calculator ──────────────────────────────────────────────────────────
 
 function ABVCalculator() {
   const [og, setOg] = useState('1.054')
@@ -102,6 +112,8 @@ function ABVCalculator() {
     </div>
   )
 }
+
+// ─── Priming Sugar Calculator ────────────────────────────────────────────────
 
 function PrimingSugarCalculator() {
   const { sugarTypes } = useSugarTypes()
@@ -200,6 +212,320 @@ function PrimingSugarCalculator() {
   )
 }
 
+// ─── CER Calculator ──────────────────────────────────────────────────────────
+
+interface CERStrain {
+  id: string
+  name: string
+  strain_type: string
+  brand: string
+  opt_temp_c: number
+  temp_min_c: number
+  temp_max_c: number
+  ethanol_tol: number
+  description: string
+}
+
+interface CERPoint {
+  t: number
+  cer: number
+  phase: string
+}
+
+interface CERResult {
+  points: CERPoint[]
+  peak_cer: number
+  peak_t: number
+  alert_triggered: boolean
+  alert_t: number | null
+  strain_id: string
+  strain_name: string
+  total_co2_mg_per_L: number
+}
+
+const PHASE_COLORS: Record<string, string> = {
+  lag: '#94a3b8',
+  exponential: '#f59e0b',
+  stationary: '#10b981',
+  decline: '#ef4444',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  ale: 'Ale', lager: 'Lager', wheat: 'Wheat', wine: 'Wine',
+  champagne: 'Champagne', saison: 'Saison', wild: 'Wild / Belgian',
+}
+
+function CERCalculator() {
+  const [strains, setStrains] = useState<CERStrain[]>([])
+  const [strainSearch, setStrainSearch] = useState('')
+  const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
+  const [showStrainList, setShowStrainList] = useState(false)
+
+  const [sugar, setSugar] = useState('200')
+  const [volume, setVolume] = useState('5000')
+  const [temp, setTemp] = useState('20')
+  const [duration, setDuration] = useState('120')
+  const [threshold, setThreshold] = useState('150')
+
+  const [result, setResult] = useState<CERResult | null>(null)
+  const [displayedPoints, setDisplayedPoints] = useState<CERPoint[]>([])
+  const [animating, setAnimating] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const animRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    api.get('/calculations/cer-strains').then(r => {
+      setStrains(r.data)
+      const def = r.data.find((s: CERStrain) => s.id === 'US-05')
+      if (def) setSelectedStrain(def)
+    }).catch(() => {})
+  }, [])
+
+  const filteredStrains = strains.filter(s =>
+    s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
+    s.strain_type.toLowerCase().includes(strainSearch.toLowerCase()) ||
+    s.brand.toLowerCase().includes(strainSearch.toLowerCase())
+  )
+
+  const grouped: Record<string, CERStrain[]> = {}
+  for (const s of filteredStrains) {
+    if (!grouped[s.strain_type]) grouped[s.strain_type] = []
+    grouped[s.strain_type].push(s)
+  }
+
+  const simulate = async () => {
+    if (!selectedStrain) { toast.error('Select a yeast strain first'); return }
+    if (animRef.current) clearInterval(animRef.current)
+    setDisplayedPoints([])
+    setResult(null)
+    setLoading(true)
+    try {
+      const res = await api.post('/calculations/cer', {
+        strain_id: selectedStrain.id,
+        sugar_g: parseFloat(sugar),
+        volume_ml: parseFloat(volume),
+        temperature_c: parseFloat(temp),
+        duration_hours: parseFloat(duration),
+        alert_threshold: parseFloat(threshold),
+      })
+      const data: CERResult = res.data
+      setResult(data)
+      setAnimating(true)
+      let idx = 0
+      animRef.current = setInterval(() => {
+        idx += 2
+        if (idx >= data.points.length) {
+          idx = data.points.length
+          clearInterval(animRef.current!)
+          setAnimating(false)
+        }
+        setDisplayedPoints(data.points.slice(0, idx))
+      }, 40)
+    } catch {
+      toast.error('Simulation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const alertThresholdNum = parseFloat(threshold) || 150
+
+  // Build chart data with alert zone
+  const chartData = displayedPoints.map(p => ({ t: p.t, cer: p.cer, phase: p.phase }))
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+      {/* Inputs row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem' }}>
+
+        {/* Left: strain picker + params */}
+        <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>CO₂ Evolution Rate</h2>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Simulates CER(t) = μ(t) × X(t) × 0.49 × 1000 mg/L/h over your fermentation window.
+            </p>
+          </div>
+
+          {/* Strain selector */}
+          <div style={{ position: 'relative' }}>
+            <label style={lStyle}>Yeast Strain</label>
+            <div
+              onClick={() => setShowStrainList(v => !v)}
+              style={{ ...iStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}
+            >
+              <span style={{ fontSize: '0.8rem', color: selectedStrain ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                {selectedStrain ? selectedStrain.name : 'Select strain…'}
+              </span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>▼</span>
+            </div>
+            {showStrainList && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '8px', marginTop: 4, maxHeight: 280, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+                <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--card-bg)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.6rem', background: 'var(--parchment)', borderRadius: 6 }}>
+                    <Search size={12} color="var(--text-muted)" />
+                    <input
+                      autoFocus
+                      value={strainSearch}
+                      onChange={e => setStrainSearch(e.target.value)}
+                      placeholder="Search strains…"
+                      style={{ border: 'none', background: 'transparent', fontSize: '0.8rem', outline: 'none', width: '100%', color: 'var(--text-primary)' }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
+                {Object.entries(grouped).map(([type, list]) => (
+                  <div key={type}>
+                    <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', background: 'var(--parchment)' }}>
+                      {TYPE_LABELS[type] ?? type}
+                    </div>
+                    {list.map(s => (
+                      <div
+                        key={s.id}
+                        onClick={() => { setSelectedStrain(s); setShowStrainList(false); setStrainSearch('') }}
+                        style={{ padding: '0.55rem 0.9rem', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-primary)', background: selectedStrain?.id === s.id ? 'var(--brown-dark)' : 'transparent', transition: 'background 0.15s' }}
+                        onMouseEnter={e => { if (selectedStrain?.id !== s.id) (e.currentTarget as HTMLDivElement).style.background = 'var(--parchment)' }}
+                        onMouseLeave={e => { if (selectedStrain?.id !== s.id) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                      >
+                        <div style={{ fontWeight: 500 }}>{s.name}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{s.brand}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedStrain && (
+            <div style={{ padding: '0.6rem 0.75rem', background: 'var(--parchment)', borderRadius: 8, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              {selectedStrain.description}<br />
+              <span style={{ color: 'var(--text-muted)' }}>
+                Temp: {selectedStrain.temp_min_c}–{selectedStrain.temp_max_c}°C · EtOH tol: {selectedStrain.ethanol_tol}%
+              </span>
+            </div>
+          )}
+
+          <div>
+            <label style={lStyle}>Sugar (g)</label>
+            <input type="number" step="10" value={sugar} onChange={e => setSugar(e.target.value)} style={iStyle} />
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>Total fermentable sugar added</p>
+          </div>
+          <div>
+            <label style={lStyle}>Volume (mL)</label>
+            <input type="number" step="100" value={volume} onChange={e => setVolume(e.target.value)} style={iStyle} />
+          </div>
+          <div>
+            <label style={lStyle}>Temperature (°C)</label>
+            <input type="number" step="0.5" value={temp} onChange={e => setTemp(e.target.value)} style={iStyle} />
+          </div>
+          <div>
+            <label style={lStyle}>Simulate (hours)</label>
+            <input type="number" step="12" value={duration} onChange={e => setDuration(e.target.value)} style={iStyle} />
+          </div>
+          <div>
+            <label style={lStyle}>Alert Threshold (mg/L/h)</label>
+            <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} style={iStyle} />
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>Release pressure when CER exceeds this</p>
+          </div>
+
+          <button
+            onClick={simulate}
+            disabled={loading || animating}
+            style={{ width: '100%', padding: '0.75rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontWeight: 600, fontSize: '0.875rem', marginTop: 4 }}
+          >
+            {loading ? 'Running…' : animating ? 'Simulating…' : <><Wind size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />Run Simulation</>}
+          </button>
+        </div>
+
+        {/* Right: chart + stats */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+          {/* Alert banner */}
+          {result?.alert_triggered && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1.25rem', background: '#b54a2c18', border: '1px solid #b54a2c50', borderRadius: '10px', color: 'var(--rust)' }}>
+              <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+              <div>
+                <strong style={{ fontSize: '0.9rem' }}>Pressure Alert</strong>
+                <p style={{ fontSize: '0.8rem', margin: 0, opacity: 0.85 }}>
+                  CER exceeded {threshold} mg/L/h at <strong>{result.alert_t}h</strong>. Release pressure from your jar.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Chart */}
+          <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light)', flex: 1 }}>
+            {chartData.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--text-muted)', gap: '0.75rem' }}>
+                <Wind size={36} style={{ opacity: 0.2 }} />
+                <p style={{ fontSize: '0.875rem' }}>Configure inputs and run simulation</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="t"
+                    label={{ value: 'Time (h)', position: 'insideBottom', offset: -2, style: { fontSize: '0.72rem', fill: 'var(--text-muted)' } }}
+                    tick={{ fontSize: '0.7rem', fill: 'var(--text-muted)' }}
+                    tickCount={8}
+                  />
+                  <YAxis
+                    label={{ value: 'CER (mg/L/h)', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: '0.72rem', fill: 'var(--text-muted)' } }}
+                    tick={{ fontSize: '0.7rem', fill: 'var(--text-muted)' }}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.78rem' }}
+                    formatter={(val: number) => [`${val.toFixed(2)} mg/L/h`, 'CER']}
+                    labelFormatter={(t: number) => `Hour ${t}`}
+                  />
+                  <ReferenceLine
+                    y={alertThresholdNum}
+                    stroke="var(--rust)"
+                    strokeDasharray="6 3"
+                    label={{ value: `Alert ${alertThresholdNum}`, position: 'insideTopRight', style: { fontSize: '0.68rem', fill: 'var(--rust)' } }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cer"
+                    stroke="var(--amber)"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Stats row */}
+          {result && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+              <StatCard label="Peak CER" value={`${result.peak_cer.toFixed(1)}`} unit="mg/L/h" color="var(--amber)" />
+              <StatCard label="Peak at" value={`${result.peak_t}h`} unit="into fermentation" color="var(--slate)" />
+              <StatCard label="Total CO₂" value={`${result.total_co2_mg_per_L.toFixed(0)}`} unit="mg/L cumulative" color="var(--rust)" />
+            </div>
+          )}
+
+          {/* Phase legend */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {Object.entries(PHASE_COLORS).map(([phase, color]) => (
+              <div key={phase} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+                {phase.charAt(0).toUpperCase() + phase.slice(1)}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Shared components ───────────────────────────────────────────────────────
+
 function ResultCard({ label, value, color, sublabel }: { label: string; value: string; color: string; sublabel?: string }) {
   return (
     <div style={{ padding: '1rem', background: `${color}10`, borderRadius: '8px', border: `1px solid ${color}30` }}>
@@ -210,5 +536,15 @@ function ResultCard({ label, value, color, sublabel }: { label: string; value: s
   )
 }
 
+function StatCard({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
+  return (
+    <div style={{ padding: '0.875rem 1rem', background: 'var(--card-bg)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>{label}</div>
+      <div style={{ fontFamily: 'Fraunces, serif', fontSize: '1.4rem', color, fontWeight: 600 }}>{value}</div>
+      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>{unit}</div>
+    </div>
+  )
+}
+
 const lStyle: React.CSSProperties = { display: 'block', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.375rem' }
-const iStyle: React.CSSProperties = { width: '100%', padding: '0.6rem 0.875rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.875rem', color: 'var(--text-primary)' }
+const iStyle: React.CSSProperties = { width: '100%', padding: '0.6rem 0.875rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.875rem', color: 'var(--text-primary)', boxSizing: 'border-box' }

@@ -6,8 +6,8 @@ import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
 export default function ProjectDetailPage() {
@@ -18,7 +18,7 @@ export default function ProjectDetailPage() {
   const [showNote, setShowNote] = useState(false)
   const [showComplete, setShowComplete] = useState(false)
   const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'co2'>('ph')
-  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'reminders'>('log')
+  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'cer'>('log')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [showReminder, setShowReminder] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -255,8 +255,12 @@ export default function ProjectDetailPage() {
       {/* Tabs */}
       <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)' }}>
-          {([['log', 'Notes & Log'], ['album', `Album (${photos.length})`], ['reminders', `Reminders (${reminders.length})`]] as const).map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
+          {([
+            ['log', 'Notes & Log'],
+            ['album', `Album (${photos.length})`],
+            ...(isAlcohol ? [['cer', 'CO₂ Production']] : []),
+          ] as const).map(([tab, label]) => (
+            <button key={tab} onClick={() => setActiveTab(tab as 'log' | 'album' | 'cer')} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
               {label}
             </button>
           ))}
@@ -337,37 +341,13 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {activeTab === 'reminders' && (
+        {activeTab === 'cer' && isAlcohol && (
           <div style={{ padding: '1.5rem' }}>
-            <div style={{ marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Reminders</h2>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Scheduled alerts for pH checks, CO₂ releases, and more.</p>
-            </div>
-            {reminders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', background: 'var(--warm-white)', borderRadius: '10px', border: '2px dashed var(--border)' }}>
-                <Bell size={28} style={{ marginBottom: '0.75rem', opacity: 0.3 }} />
-                <p style={{ fontSize: '0.875rem' }}>No reminders set. Add one to get SMS alerts for pH checks or CO₂ releases.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {reminders.map(r => (
-                  <ReminderCard
-                    key={r.id}
-                    reminder={r}
-                    onDelete={() => {
-                      api.delete(`/reminders/${r.id}`)
-                        .then(() => { toast.success('Reminder deleted'); loadReminders() })
-                        .catch(() => toast.error('Failed to delete reminder'))
-                    }}
-                    onSendNow={() => {
-                      api.post(`/reminders/${r.id}/send`)
-                        .then(() => toast.success('SMS sent!'))
-                        .catch((err) => toast.error(err?.response?.data?.detail || 'Failed to send SMS'))
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+            <CERTab
+              initialTemp={project.fermentation_temp_celsius ?? 20}
+              yeastStrainId={project.yeast_strain?.name}
+              startDate={project.start_date}
+            />
           </div>
         )}
       </div>
@@ -689,6 +669,195 @@ function friendlyInterval(hours: number): string {
     return `Every ${n} day${n !== 1 ? 's' : ''}`
   }
   return `Every ${hours} hour${hours !== 1 ? 's' : ''}`
+}
+
+// ─── CER Tab ─────────────────────────────────────────────────────────────────
+
+interface CERStrain { id: string; name: string; strain_type: string; brand: string; opt_temp_c: number; temp_min_c: number; temp_max_c: number; ethanol_tol: number; description: string }
+interface CERPoint  { t: number; cer: number; phase: string }
+interface CERResult { points: CERPoint[]; peak_cer: number; peak_t: number; alert_triggered: boolean; alert_t: number | null; strain_id: string; strain_name: string; total_co2_mg_per_L: number }
+
+const TYPE_LABELS: Record<string, string> = { ale: 'Ale', lager: 'Lager', wheat: 'Wheat', wine: 'Wine', champagne: 'Champagne', saison: 'Saison', wild: 'Wild / Belgian' }
+const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
+const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
+
+function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number; yeastStrainId?: string; startDate?: string }) {
+  const [strains, setStrains] = useState<CERStrain[]>([])
+  const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
+  const [strainSearch, setStrainSearch] = useState('')
+  const [showList, setShowList] = useState(false)
+
+  const [sugar, setSugar]         = useState('200')
+  const [volume, setVolume]       = useState('5000')
+  const [temp, setTemp]           = useState(String(initialTemp))
+  const [threshold, setThreshold] = useState('150')
+
+  const [result, setResult]       = useState<CERResult | null>(null)
+  const [displayed, setDisplayed] = useState<CERPoint[]>([])
+  const [animating, setAnimating] = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const animRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Duration = hours since project start, minimum 48h, maximum 240h
+  const durationHours = startDate
+    ? Math.min(240, Math.max(48, Math.ceil((Date.now() - new Date(startDate).getTime()) / 3600000)))
+    : 120
+
+  const run = (strain: CERStrain, sg: string, vol: string, t: string) => {
+    if (animRef.current) clearInterval(animRef.current)
+    setDisplayed([]); setResult(null); setLoading(true)
+    api.post('/calculations/cer', {
+      strain_id: strain.id,
+      sugar_g: parseFloat(sg) || 200,
+      volume_ml: parseFloat(vol) || 5000,
+      temperature_c: parseFloat(t) || initialTemp,
+      duration_hours: durationHours,
+      alert_threshold: parseFloat(threshold) || 150,
+    }).then(res => {
+      const data: CERResult = res.data
+      setResult(data); setAnimating(true)
+      let idx = 0
+      animRef.current = setInterval(() => {
+        idx += 3
+        if (idx >= data.points.length) { idx = data.points.length; clearInterval(animRef.current!); setAnimating(false) }
+        setDisplayed(data.points.slice(0, idx))
+      }, 30)
+    }).catch(() => toast.error('Could not load CO₂ data'))
+    .finally(() => setLoading(false))
+  }
+
+  // Load strains once, then auto-run
+  useEffect(() => {
+    api.get('/calculations/cer-strains').then(r => {
+      const list: CERStrain[] = r.data
+      setStrains(list)
+      const match = yeastStrainId
+        ? list.find(s => s.name.toLowerCase().includes(yeastStrainId.toLowerCase())) ?? list.find(s => s.id === 'US-05')
+        : list.find(s => s.id === 'US-05')
+      if (match) { setSelectedStrain(match); run(match, sugar, volume, temp) }
+    }).catch(() => {})
+  }, [])
+
+  // Re-run when user changes inputs (debounced via blur)
+  const rerun = () => { if (selectedStrain) run(selectedStrain, sugar, volume, temp) }
+
+  const filtered = strains.filter(s =>
+    s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
+    s.strain_type.toLowerCase().includes(strainSearch.toLowerCase()) ||
+    s.brand.toLowerCase().includes(strainSearch.toLowerCase())
+  )
+  const grouped: Record<string, CERStrain[]> = {}
+  for (const s of filtered) { if (!grouped[s.strain_type]) grouped[s.strain_type] = []; grouped[s.strain_type].push(s) }
+
+  const alertNum = parseFloat(threshold) || 150
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.5rem' }}>
+      {/* Controls */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          Live CO₂ evolution rate for this project. Adjust inputs to update the curve.
+        </p>
+
+        {/* Strain picker */}
+        <div style={{ position: 'relative' }}>
+          <label style={cerLabel}>Yeast Strain</label>
+          <div onClick={() => setShowList(v => !v)} style={{ ...cerInput, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.8rem', color: selectedStrain ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+              {selectedStrain ? selectedStrain.name : 'Select…'}
+            </span>
+            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>▼</span>
+          </div>
+          {showList && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '8px', marginTop: 4, maxHeight: 240, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+              <div style={{ padding: '0.4rem', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--card-bg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.5rem', background: 'var(--parchment)', borderRadius: 6 }}>
+                  <Search size={11} color="var(--text-muted)" />
+                  <input autoFocus value={strainSearch} onChange={e => setStrainSearch(e.target.value)} placeholder="Search…" style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', outline: 'none', width: '100%', color: 'var(--text-primary)' }} onClick={e => e.stopPropagation()} />
+                </div>
+              </div>
+              {Object.entries(grouped).map(([type, list]) => (
+                <div key={type}>
+                  <div style={{ padding: '0.35rem 0.7rem', fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', background: 'var(--parchment)' }}>
+                    {TYPE_LABELS[type] ?? type}
+                  </div>
+                  {list.map(s => (
+                    <div key={s.id}
+                      onClick={() => { setSelectedStrain(s); setShowList(false); setStrainSearch(''); run(s, sugar, volume, temp) }}
+                      style={{ padding: '0.5rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', background: selectedStrain?.id === s.id ? 'var(--brown-dark)' : 'transparent' }}>
+                      <div style={{ fontWeight: 500 }}>{s.name}</div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{s.brand}</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div><label style={cerLabel}>Sugar (g)</label><input type="number" step="10" value={sugar} onChange={e => setSugar(e.target.value)} onBlur={rerun} style={cerInput} /></div>
+        <div><label style={cerLabel}>Volume (mL)</label><input type="number" step="100" value={volume} onChange={e => setVolume(e.target.value)} onBlur={rerun} style={cerInput} /></div>
+        <div><label style={cerLabel}>Temperature (°C)</label><input type="number" step="0.5" value={temp} onChange={e => setTemp(e.target.value)} onBlur={rerun} style={cerInput} /></div>
+        <div>
+          <label style={cerLabel}>Alert Threshold (mg/L/h)</label>
+          <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} onBlur={rerun} style={cerInput} />
+        </div>
+
+        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
+          Showing {durationHours}h window · Updates on input change
+        </p>
+      </div>
+
+      {/* Chart + stats */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {result?.alert_triggered && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem 1rem', background: '#b54a2c18', border: '1px solid #b54a2c50', borderRadius: '10px', color: 'var(--rust)' }}>
+            <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+            <div>
+              <strong style={{ fontSize: '0.875rem' }}>Pressure Alert</strong>
+              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>CER exceeded {threshold} mg/L/h at <strong>{result.alert_t}h</strong>. Release pressure from your jar.</p>
+            </div>
+          </div>
+        )}
+
+        <div style={{ background: 'var(--warm-white)', borderRadius: '10px', padding: '1rem', border: '1px solid var(--border-light)' }}>
+          {displayed.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem' }}>
+              <Wind size={30} style={{ opacity: 0.2 }} />
+              <p style={{ fontSize: '0.8rem' }}>{loading ? 'Calculating…' : 'Loading CO₂ data…'}</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={displayed} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="t" tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'Time (h)', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} tickCount={8} />
+                <YAxis tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'CER (mg/L/h)', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} />
+                <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }} formatter={(v: number) => [`${v.toFixed(2)} mg/L/h`, 'CER']} labelFormatter={(t: number) => `Hour ${t}`} />
+                <ReferenceLine y={alertNum} stroke="var(--rust)" strokeDasharray="5 3" label={{ value: `Alert ${alertNum}`, position: 'insideTopRight', style: { fontSize: '0.65rem', fill: 'var(--rust)' } }} />
+                <Line type="monotone" dataKey="cer" stroke="var(--amber)" strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {result && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
+            {[
+              { label: 'Peak CER', value: `${result.peak_cer.toFixed(1)}`, unit: 'mg/L/h' },
+              { label: 'Peak at', value: `${result.peak_t}h`, unit: 'into fermentation' },
+              { label: 'Total CO₂', value: `${result.total_co2_mg_per_L.toFixed(0)}`, unit: 'mg/L cumulative' },
+            ].map(({ label, value, unit }) => (
+              <div key={label} style={{ padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
+                <div style={{ fontSize: '1.2rem', fontFamily: 'Fraunces, serif', color: 'var(--amber)', fontWeight: 600 }}>{value}</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{unit}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function ReminderCard({ reminder, onDelete, onSendNow }: { reminder: Reminder; onDelete: () => void; onSendNow: () => void }) {

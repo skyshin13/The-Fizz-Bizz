@@ -356,6 +356,46 @@ class CO2ActivityResponse(BaseModel):
     recommendation: str
 
 
+# ─── CER Simulation Schemas ───────────────────────────────────────────────
+
+class CERStrainOut(BaseModel):
+    id: str
+    name: str
+    strain_type: str
+    brand: str
+    opt_temp_c: float
+    temp_min_c: float
+    temp_max_c: float
+    ethanol_tol: float
+    description: str
+
+
+class CERRequest(BaseModel):
+    strain_id: str
+    sugar_g: float
+    volume_ml: float
+    temperature_c: float
+    duration_hours: float = 120.0
+    alert_threshold: float = 150.0
+
+
+class CERPointOut(BaseModel):
+    t: float
+    cer: float
+    phase: str
+
+
+class CERResponse(BaseModel):
+    points: List[CERPointOut]
+    peak_cer: float
+    peak_t: float
+    alert_triggered: bool
+    alert_t: Optional[float] = None
+    strain_id: str
+    strain_name: str
+    total_co2_mg_per_L: float
+
+
 # ─── Social Schemas ───────────────────────────────────────────────────────────
 
 class PublicUserOut(BaseModel):
