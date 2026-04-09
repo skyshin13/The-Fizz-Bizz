@@ -28,7 +28,11 @@ export default function ProjectDetailPage() {
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
   const loadReminders = () => api.get(`/projects/${id}/reminders`).then(r => setReminders(r.data)).catch(() => {})
-  useEffect(() => { load(); loadReminders() }, [id])
+  useEffect(() => {
+    load(); loadReminders()
+    const interval = setInterval(load, 30000)
+    return () => clearInterval(interval)
+  }, [id])
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center' }}>Loading...</div>
   if (!project) return <div style={{ padding: '3rem', textAlign: 'center' }}>Project not found.</div>
