@@ -216,6 +216,14 @@ class ProjectOut(BaseModel):
 
 # ─── Yeast Schemas ────────────────────────────────────────────────────────────
 
+class UserProjectRef(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class YeastProfileCreate(BaseModel):
     name: str
     strain_code: Optional[str] = None
@@ -230,6 +238,9 @@ class YeastProfileCreate(BaseModel):
     temp_range_max_c: Optional[float] = None
     alcohol_tolerance: Optional[float] = None
     flavor_notes: Optional[str] = None
+    best_for: Optional[str] = None
+    lab_description: Optional[str] = None
+    recommended_styles: Optional[List[str]] = None
 
 
 class YeastProfileOut(YeastProfileCreate):
@@ -238,7 +249,7 @@ class YeastProfileOut(YeastProfileCreate):
     is_public: bool
     created_at: datetime
     times_used: Optional[int] = 0
-    user_projects: Optional[List[str]] = []
+    user_projects: Optional[List[UserProjectRef]] = []
 
     class Config:
         from_attributes = True

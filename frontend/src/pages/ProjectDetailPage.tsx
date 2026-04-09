@@ -118,6 +118,16 @@ export default function ProjectDetailPage() {
                 <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.625rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px' }}>{project.status}</span>
                 {daysSince != null && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Day {daysSince}</span>}
               </div>
+              {project.yeast_strain && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.375rem' }}>
+                  <FlaskConical size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {project.yeast_strain.name}
+                    {project.yeast_strain.strain_code && <span style={{ fontFamily: 'monospace', marginLeft: '0.3rem', opacity: 0.75 }}>({project.yeast_strain.strain_code})</span>}
+                    {project.yeast_strain.brand && <span style={{ marginLeft: '0.3rem', opacity: 0.75 }}>· {project.yeast_strain.brand}</span>}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>

@@ -174,6 +174,9 @@ class YeastProfile(Base):
     temp_range_max_c = Column(Float)
     alcohol_tolerance = Column(Float) # max ABV %
     flavor_notes = Column(Text)
+    best_for = Column(Text)
+    lab_description = Column(Text)
+    recommended_styles = Column(JSON)       # list of style name strings from lab website
     is_public = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

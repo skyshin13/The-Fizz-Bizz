@@ -20,7 +20,7 @@ export default function RecipesPage() {
   const { getEmoji } = useFermentationTypes()
 
   useEffect(() => {
-    api.get('/recipes')
+    api.get('/recipes/')
       .then(r => setRecipes(r.data))
       .catch(() => setError('Could not load the recipe library. The server may be offline.'))
       .finally(() => setLoading(false))

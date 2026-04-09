@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
 from app.models.models import YeastProfile, ProjectYeastConnection, FermentationProject, User
-from app.schemas.schemas import YeastProfileCreate, YeastProfileOut
+from app.schemas.schemas import YeastProfileCreate, YeastProfileOut, UserProjectRef
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/yeasts", tags=["Yeast Profiles"])
@@ -30,7 +30,7 @@ def list_yeasts(
             )
             .all()
         )
-        project_names = [c.project.name for c in connections if c.project]
+        project_names = [UserProjectRef(id=c.project.id, name=c.project.name) for c in connections if c.project]
         yeast_out = YeastProfileOut.model_validate(y)
         yeast_out.times_used = len(connections)
         yeast_out.user_projects = project_names

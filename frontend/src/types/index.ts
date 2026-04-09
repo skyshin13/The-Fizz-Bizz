@@ -169,10 +169,13 @@ export interface YeastProfile {
   temp_range_max_c?: number
   alcohol_tolerance?: number
   flavor_notes?: string
+  best_for?: string
+  lab_description?: string
+  recommended_styles?: string[]
   is_public: boolean
   created_at: string
   times_used?: number
-  user_projects?: string[]
+  user_projects?: { id: number; name: string }[]
 }
 
 export interface RecipeIngredient {

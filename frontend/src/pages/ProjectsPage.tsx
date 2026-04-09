@@ -107,9 +107,17 @@ function ProjectRow({ project, onDelete, getEmoji }: { project: Project; onDelet
         </div>
       </Link>
       <div style={{ padding: '0.625rem 1.25rem', background: 'var(--parchment)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Clock size={11} /> {project.start_date ? formatDistanceToNow(new Date(project.start_date), { addSuffix: true }) : 'No start date'}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Clock size={11} /> {project.start_date ? formatDistanceToNow(new Date(project.start_date), { addSuffix: true }) : 'No start date'}
+          </span>
+          {project.yeast_strain && (
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Dna size={11} />
+              {project.yeast_strain.name}{project.yeast_strain.brand ? ` · ${project.yeast_strain.brand}` : ''}
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '20px', background: project.status === 'active' ? '#4a674118' : '#3d4e5c18', color: project.status === 'active' ? 'var(--moss)' : 'var(--slate)' }}>
             {project.status}
@@ -136,7 +144,9 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
     is_public: false,
   })
   const [yeastId, setYeastId] = useState<string>('')
-  const [yeasts, setYeasts] = useState<{ id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string }[]>([])
+  const [yeastSearch, setYeastSearch] = useState('')
+  const [yeastDropdownOpen, setYeastDropdownOpen] = useState(false)
+  const [yeasts, setYeasts] = useState<{ id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string; best_for?: string }[]>([])
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -148,7 +158,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
   const isAlcohol = ALCOHOL_TYPES.has(form.fermentation_type)
 
   useEffect(() => {
-    api.get('/yeasts').then(r => setYeasts(r.data)).catch(() => {})
+    api.get('/yeasts/').then(r => setYeasts(r.data)).catch(() => {})
   }, [])
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,29 +271,17 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
               )}
               {isAlcohol && (
                 <Field label="Yeast Strain">
-                  <select value={yeastId} onChange={e => setYeastId(e.target.value)} style={iStyle}>
-                    <option value="">— Select a strain (optional) —</option>
-                    {yeasts.filter(y => ['ale', 'lager', 'wine'].includes(y.yeast_type || '')).map(y => (
-                      <option key={y.id} value={y.id}>
-                        {y.name}{y.strain_code ? ` (${y.strain_code})` : ''}{y.brand ? ` · ${y.brand}` : ''}
-                      </option>
-                    ))}
-                    {yeasts.filter(y => !['ale', 'lager', 'wine'].includes(y.yeast_type || '')).length > 0 && (
-                      <>
-                        <option disabled>──────────</option>
-                        {yeasts.filter(y => !['ale', 'lager', 'wine'].includes(y.yeast_type || '')).map(y => (
-                          <option key={y.id} value={y.id}>
-                            {y.name}{y.strain_code ? ` (${y.strain_code})` : ''}{y.brand ? ` · ${y.brand}` : ''}
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                  {yeasts.length === 0 && (
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Dna size={11} /> No strains in library yet — add them in the Yeast Library.
-                    </p>
-                  )}
+                  <YeastTypeahead
+                    yeasts={yeasts}
+                    yeastId={yeastId}
+                    yeastSearch={yeastSearch}
+                    dropdownOpen={yeastDropdownOpen}
+                    onSearchChange={q => { setYeastSearch(q); setYeastDropdownOpen(true); if (!q) { setYeastId('') } }}
+                    onSelect={y => { setYeastId(String(y.id)); setYeastSearch(`${y.name}${y.brand ? ` · ${y.brand}` : ''}`); setYeastDropdownOpen(false) }}
+                    onClear={() => { setYeastId(''); setYeastSearch(''); setYeastDropdownOpen(false) }}
+                    onFocus={() => setYeastDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setYeastDropdownOpen(false), 150)}
+                  />
                 </Field>
               )}
               <Field label="Initial pH">
@@ -323,6 +321,101 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+function YeastTypeahead({
+  yeasts, yeastId, yeastSearch, dropdownOpen,
+  onSearchChange, onSelect, onClear, onFocus, onBlur,
+}: {
+  yeasts: { id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string; best_for?: string }[]
+  yeastId: string
+  yeastSearch: string
+  dropdownOpen: boolean
+  onSearchChange: (q: string) => void
+  onSelect: (y: { id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string }) => void
+  onClear: () => void
+  onFocus: () => void
+  onBlur: () => void
+}) {
+  const q = yeastSearch.toLowerCase()
+  const filtered = yeasts
+    .filter(y => ['ale', 'lager', 'wine'].includes(y.yeast_type || ''))
+    .filter(y =>
+      !q ||
+      y.name.toLowerCase().includes(q) ||
+      (y.brand?.toLowerCase().includes(q) ?? false) ||
+      (y.strain_code?.toLowerCase().includes(q) ?? false) ||
+      (y.best_for?.toLowerCase().includes(q) ?? false)
+    )
+    .slice(0, 10)
+
+  const selected = yeastId ? yeasts.find(y => String(y.id) === yeastId) : null
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <Search size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+        <input
+          value={yeastSearch}
+          onChange={e => onSearchChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder="Search by name, brand, or style (e.g. English Ale)…"
+          style={{ ...iStyle, paddingLeft: '2.1rem', paddingRight: yeastId ? '2rem' : '0.875rem' }}
+        />
+        {yeastId && (
+          <button type="button" onClick={onClear} style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+            <X size={13} />
+          </button>
+        )}
+      </div>
+
+      {selected && (
+        <div style={{ marginTop: '0.375rem', fontSize: '0.75rem', color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <Dna size={11} />
+          <span>{selected.name}{selected.brand ? ` · ${selected.brand}` : ''}{selected.yeast_type ? ` · ${selected.yeast_type}` : ''}</span>
+        </div>
+      )}
+
+      {dropdownOpen && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          background: 'var(--card-bg)', border: '1px solid var(--border)',
+          borderRadius: '8px', boxShadow: 'var(--shadow-md)', marginTop: '2px',
+          maxHeight: '260px', overflowY: 'auto',
+        }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              No strains match "{yeastSearch}"
+            </div>
+          ) : filtered.map(y => (
+            <button
+              key={y.id}
+              type="button"
+              onMouseDown={() => onSelect(y)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '0.625rem 1rem',
+                background: String(y.id) === yeastId ? '#c8832a12' : 'transparent',
+                border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--border-light)',
+              }}
+            >
+              <div style={{ fontSize: '0.83rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                {y.name}{y.strain_code ? <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.375rem' }}>({y.strain_code})</span> : null}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                {[y.brand, y.yeast_type].filter(Boolean).join(' · ')}
+              </div>
+              {y.best_for && (
+                <div style={{ fontSize: '0.7rem', color: 'var(--moss)', marginTop: '0.15rem', opacity: 0.85 }}>
+                  Best for: {y.best_for.length > 60 ? y.best_for.slice(0, 60) + '…' : y.best_for}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
