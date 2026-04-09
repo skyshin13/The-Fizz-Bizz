@@ -799,7 +799,7 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
   useEffect(() => {
     if (!liveMode || !result) return
     if (liveIdx >= result.points.length) { setLiveMode(false); return }
-    const t = setTimeout(() => setLiveIdx(i => i + 1), 10 * 60 * 1000)
+    const t = setTimeout(() => setLiveIdx(i => i + 1), 1000)
     return () => clearTimeout(t)
   }, [liveMode, liveIdx, result])
 

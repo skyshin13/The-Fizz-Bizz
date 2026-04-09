@@ -250,40 +250,50 @@ def simulate_cer(
 
     t = 0.0
     while t <= duration_hours:
-        # Determine phase
+        # Determine phase and fermentation rate (mu_ferm)
+        # Growth rate (mu) drives biomass increase; fermentation rate (mu_ferm)
+        # drives CO₂ production. During stationary/decline, yeast still ferments
+        # (maintenance metabolism) even though they've stopped growing.
         if t < t_lag:
             phase = "lag"
-            mu = 0.0
-            dX = 0.0
+            mu_ferm = 0.0
+
         elif t < t_exp:
             phase = "exponential"
             sf = sugar_factor(S, Ks=20.0)
             mu = mu_eff_base * sf
-            # Ethanol inhibition
             if ethanol_est > EtOH_tol_g_L:
                 mu *= 0.05
             dX = mu * X * dt
-            # Clamp to Xmax
             X_new = X + dX
             if X_new > strain.X_max:
                 dX = strain.X_max - X
                 X_new = strain.X_max
-            # Sugar consumption: Yxs ≈ 0.5 g biomass per g sugar
             dS = -dX / 0.5
             S = max(0.0, S + dS)
-            # Ethanol: 0.51 g per g sugar consumed
             ethanol_est += abs(dS) * 0.51
             X = X_new
+            mu_ferm = mu
+
         elif t < t_stat:
             phase = "stationary"
-            mu = 0.0
             X = strain.X_max
+            # Maintenance fermentation: ~12% of peak rate, tapering with sugar
+            mu_ferm = mu_eff_base * 0.12 * sugar_factor(S, Ks=20.0)
+            dS = -mu_ferm * X * dt / 0.5
+            S = max(0.0, S + dS)
+            ethanol_est += abs(dS) * 0.51
+
         else:
             phase = "decline"
-            mu = 0.0
             X = strain.X_max * math.exp(-strain.k_d * (t - t_stat))
+            # Residual fermentation: ~4% of peak rate, tapering with sugar and biomass
+            mu_ferm = mu_eff_base * 0.04 * sugar_factor(S, Ks=20.0)
+            dS = -mu_ferm * X * dt / 0.5
+            S = max(0.0, S + dS)
+            ethanol_est += abs(dS) * 0.51
 
-        cer = mu * X * 0.49 * 1000.0  # mg/L/h
+        cer = mu_ferm * X * 0.49 * 1000.0  # mg/L/h
 
         total_co2 += cer * dt
 
@@ -297,6 +307,12 @@ def simulate_cer(
 
         points.append(CERPoint(t=round(t, 2), cer=round(cer, 4), phase=phase))
         t += dt
+
+    # Downsample to ~60 evenly-spaced points for the graph
+    max_points = 60
+    if len(points) > max_points:
+        step = len(points) / max_points
+        points = [points[round(i * step)] for i in range(max_points)]
 
     return CERResult(
         points=points,
