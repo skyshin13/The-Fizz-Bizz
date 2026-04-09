@@ -41,8 +41,13 @@ export default function ProjectDetailPage() {
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )
 
-  const chartData = project.measurements.map(m => ({
+  const sortedMeasurements = [...project.measurements].sort(
+    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
+  )
+  const firstTs = sortedMeasurements.length > 0 ? new Date(sortedMeasurements[0].logged_at).getTime() : 0
+  const chartData = sortedMeasurements.map(m => ({
     date: format(parseISO(m.logged_at), 'MMM d'),
+    minutesElapsed: Math.round((new Date(m.logged_at).getTime() - firstTs) / 60000),
     ph: m.ph ?? null,
     sg: m.specific_gravity ?? null,
     abv: m.alcohol_by_volume ?? null,
@@ -244,7 +249,13 @@ export default function ProjectDetailPage() {
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+              <XAxis
+                dataKey={activeChart === 'co2' ? 'minutesElapsed' : 'date'}
+                type={activeChart === 'co2' ? 'number' : 'category'}
+                domain={activeChart === 'co2' ? ['auto', 'auto'] : undefined}
+                tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                tickFormatter={activeChart === 'co2' ? (v: number) => v < 60 ? `${v}m` : `${Math.floor(v / 60)}h${v % 60 > 0 ? `${v % 60}m` : ''}` : undefined}
+              />
               <YAxis
                 tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
                 domain={
