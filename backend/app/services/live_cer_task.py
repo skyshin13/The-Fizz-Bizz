@@ -28,7 +28,7 @@ DEFAULT_STRAIN = "US-05"
 SUPPORTED_TYPES = {"beer", "mead", "cider", "wine", "alcohol_brewing"}
 
 # Backfill one point per this many hours of elapsed time
-BACKFILL_INTERVAL_HOURS = 1.0
+BACKFILL_INTERVAL_HOURS = 24.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
