@@ -182,6 +182,7 @@ class YeastProfile(Base):
 
     creator = relationship("User", back_populates="yeast_profiles")
     project_connections = relationship("ProjectYeastConnection", back_populates="yeast")
+    recipe_ingredients = relationship("RecipeIngredient", back_populates="yeast_profile")
 
 
 class ProjectYeastConnection(Base):
@@ -253,8 +254,10 @@ class RecipeIngredient(Base):
     notes = Column(Text)
     is_optional = Column(Boolean, default=False)
     order_index = Column(Integer, default=0)
+    yeast_profile_id = Column(Integer, ForeignKey("yeast_profiles.id"), nullable=True)
 
     recipe = relationship("Recipe", back_populates="ingredients")
+    yeast_profile = relationship("YeastProfile", back_populates="recipe_ingredients")
 
 
 class Friendship(Base):

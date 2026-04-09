@@ -176,6 +176,7 @@ export interface YeastProfile {
   created_at: string
   times_used?: number
   user_projects?: { id: number; name: string }[]
+  linked_recipes?: { id: number; name: string }[]
 }
 
 export interface RecipeIngredient {
@@ -187,6 +188,7 @@ export interface RecipeIngredient {
   notes?: string
   is_optional: boolean
   order_index: number
+  yeast_profile_id?: number
 }
 
 export interface Recipe {

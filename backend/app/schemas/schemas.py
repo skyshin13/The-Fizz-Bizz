@@ -243,6 +243,14 @@ class YeastProfileCreate(BaseModel):
     recommended_styles: Optional[List[str]] = None
 
 
+class RecipeRef(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class YeastProfileOut(YeastProfileCreate):
     id: int
     creator_id: Optional[int] = None
@@ -250,6 +258,7 @@ class YeastProfileOut(YeastProfileCreate):
     created_at: datetime
     times_used: Optional[int] = 0
     user_projects: Optional[List[UserProjectRef]] = []
+    linked_recipes: Optional[List[RecipeRef]] = []
 
     class Config:
         from_attributes = True
@@ -269,6 +278,7 @@ class RecipeIngredientCreate(BaseModel):
 class RecipeIngredientOut(RecipeIngredientCreate):
     id: int
     recipe_id: int
+    yeast_profile_id: Optional[int] = None
 
     class Config:
         from_attributes = True

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
 import { Recipe } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
@@ -18,10 +19,18 @@ export default function RecipesPage() {
   const [search, setSearch] = useState('')
   const [difficulty, setDifficulty] = useState('All')
   const { getEmoji } = useFermentationTypes()
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     api.get('/recipes/')
-      .then(r => setRecipes(r.data))
+      .then(r => {
+        setRecipes(r.data)
+        const targetId = searchParams.get('recipe')
+        if (targetId) {
+          const match = r.data.find((rec: Recipe) => rec.id === parseInt(targetId))
+          if (match) setSelected(match)
+        }
+      })
       .catch(() => setError('Could not load the recipe library. The server may be offline.'))
       .finally(() => setLoading(false))
   }, [])
@@ -198,6 +207,7 @@ function RecipeCard({ recipe, isSelected, onSelect, getEmoji }: {
 
 /* ── Detail panel ── */
 function RecipeDetail({ recipe, getEmoji }: { recipe: Recipe; getEmoji: (type: string) => string }) {
+  const navigate = useNavigate()
   return (
     <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--amber)', position: 'sticky', top: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -222,12 +232,22 @@ function RecipeDetail({ recipe, getEmoji }: { recipe: Recipe; getEmoji: (type: s
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {[...recipe.ingredients].sort((a, b) => a.order_index - b.order_index).map(ing => (
-              <div key={ing.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-light)', fontSize: '0.85rem' }}>
-                <span style={{ color: ing.is_optional ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                  {ing.name}
-                  {ing.is_optional && <span style={{ fontSize: '0.7rem', marginLeft: 4, color: 'var(--text-muted)' }}>(optional)</span>}
-                </span>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+              <div key={ing.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid var(--border-light)', fontSize: '0.85rem', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ color: ing.is_optional ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                    {ing.name}
+                    {ing.is_optional && <span style={{ fontSize: '0.7rem', marginLeft: 4, color: 'var(--text-muted)' }}>(optional)</span>}
+                  </span>
+                  {ing.yeast_profile_id && (
+                    <button
+                      onClick={() => navigate(`/yeasts?yeast=${ing.yeast_profile_id}`)}
+                      style={{ fontSize: '0.65rem', padding: '0.1rem 0.45rem', borderRadius: '20px', background: 'var(--amber)18', color: 'var(--amber)', border: '1px solid var(--amber)40', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      View in library →
+                    </button>
+                  )}
+                </div>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                   {ing.quantity} {ing.unit}
                 </span>
               </div>

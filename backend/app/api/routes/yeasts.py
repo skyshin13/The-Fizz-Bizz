@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
-from app.models.models import YeastProfile, ProjectYeastConnection, FermentationProject, User
-from app.schemas.schemas import YeastProfileCreate, YeastProfileOut, UserProjectRef
+from app.models.models import YeastProfile, ProjectYeastConnection, FermentationProject, User, RecipeIngredient, Recipe
+from app.schemas.schemas import YeastProfileCreate, YeastProfileOut, UserProjectRef, RecipeRef
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/yeasts", tags=["Yeast Profiles"])
@@ -31,9 +31,19 @@ def list_yeasts(
             .all()
         )
         project_names = [UserProjectRef(id=c.project.id, name=c.project.name) for c in connections if c.project]
+
+        linked = (
+            db.query(Recipe)
+            .join(RecipeIngredient, RecipeIngredient.recipe_id == Recipe.id)
+            .filter(RecipeIngredient.yeast_profile_id == y.id)
+            .distinct()
+            .all()
+        )
+
         yeast_out = YeastProfileOut.model_validate(y)
         yeast_out.times_used = len(connections)
         yeast_out.user_projects = project_names
+        yeast_out.linked_recipes = [RecipeRef(id=r.id, name=r.name) for r in linked]
         result.append(yeast_out)
 
     return result

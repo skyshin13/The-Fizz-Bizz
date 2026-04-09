@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
 import { YeastProfile } from '../types'
 import { Dna, Thermometer, FlaskConical, Search, AlertCircle, X, ChevronDown, ChevronUp } from 'lucide-react'
@@ -70,10 +70,18 @@ export default function YeastsPage() {
   const [search, setSearch]           = useState('')
   const [typeFilter, setTypeFilter]   = useState('All')
   const [brewCategory, setBrewCategory] = useState<BrewCategory | null>(null)
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     api.get('/yeasts/')
-      .then(r => setYeasts(r.data))
+      .then(r => {
+        setYeasts(r.data)
+        const targetId = searchParams.get('yeast')
+        if (targetId) {
+          const match = r.data.find((y: YeastProfile) => y.id === parseInt(targetId))
+          if (match) setSelected(match)
+        }
+      })
       .catch(() => setError('Could not load the yeast library. The server may be offline.'))
       .finally(() => setLoading(false))
   }, [])
@@ -346,6 +354,7 @@ function YeastCard({ yeast, selected, onClick }: { yeast: YeastProfile; selected
 
 function DetailPanel({ yeast, onClose }: { yeast: YeastProfile; onClose: () => void }) {
   const [notesExpanded, setNotesExpanded] = useState(false)
+  const navigate = useNavigate()
   const typeColor = TYPE_COLOR[yeast.yeast_type ?? ''] || 'var(--amber)'
   const attenuation = attenuationLabel(yeast)
   const temp = tempLabel(yeast)
@@ -445,6 +454,24 @@ function DetailPanel({ yeast, onClose }: { yeast: YeastProfile; onClose: () => v
         <div style={{ marginBottom: '1.125rem' }}>
           <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Flavor Notes</div>
           <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{yeast.flavor_notes}</p>
+        </div>
+      )}
+
+      {/* Linked recipes */}
+      {(yeast.linked_recipes ?? []).length > 0 && (
+        <div style={{ marginBottom: '1.125rem' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Featured In Recipes</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            {yeast.linked_recipes!.map(r => (
+              <button
+                key={r.id}
+                onClick={() => navigate(`/recipes?recipe=${r.id}`)}
+                style={{ textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--amber)', padding: '0', textDecoration: 'underline', textUnderlineOffset: '2px', opacity: 0.9 }}
+              >
+                → {r.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
