@@ -4,15 +4,13 @@ Live CER Background Task
 Every 30 seconds, samples the CER simulation at the current elapsed time
 for each active fermentation project and appends a new MeasurementLog row.
 
-This makes the CO2 chart on the Project Detail page grow in real time
-without any physical sensor — useful for demos.
-
-CO2 PSI is approximated from cumulative CO2 (mg/L) via a scale factor.
+On the first run for a project, backfills hourly data points from project
+start up to now so the chart is immediately populated with a full curve.
 """
 
 import asyncio
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.db.database import SessionLocal
 from app.models.models import (
@@ -25,21 +23,17 @@ from app.services.cer_engine import simulate_cer, STRAIN_MAP
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 INTERVAL_SECONDS = 30
-
-# mg/L cumulative CO2 → PSI conversion factor (empirical, demo-quality)
 CO2_TO_PSI = 300.0
-
-# Default CER strain when project has no matching strain
 DEFAULT_STRAIN = "US-05"
-
-# Fermentation types that should get live CER data
 SUPPORTED_TYPES = {"beer", "mead", "cider", "wine", "alcohol_brewing"}
+
+# Backfill one point per this many hours of elapsed time
+BACKFILL_INTERVAL_HOURS = 1.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _resolve_strain(project, db) -> str:
-    """Find the best CER strain ID for a project."""
     conn = db.query(ProjectYeastConnection).filter_by(project_id=project.id).first()
     if conn:
         from app.models.models import YeastProfile
@@ -50,28 +44,35 @@ def _resolve_strain(project, db) -> str:
 
 
 def _estimate_sugar_g(project) -> float:
-    """Estimate initial sugar mass from OG and batch size."""
     og = project.initial_gravity or 1.050
     volume_l = project.batch_size_liters or 19.0
-    # Rough approximation: extract g/L ≈ (OG - 1) * 2500
     sugar_g_per_l = (og - 1.0) * 2500
     return max(50.0, sugar_g_per_l * volume_l)
 
 
-def _get_latest_co2(project_id: int, db) -> tuple[float, datetime | None]:
-    """Return (latest co2_psi, logged_at) or (0.0, None) if no readings."""
-    latest = (
-        db.query(MeasurementLog)
+def _psi_at_hours(result_points, target_hours: float) -> float:
+    """Compute cumulative CO2 PSI at a given elapsed-hours point."""
+    cumulative = sum(p.cer * 0.5 for p in result_points if p.t <= target_hours)
+    psi = cumulative / CO2_TO_PSI + random.uniform(-0.05, 0.05)
+    return round(max(0.0, psi), 2)
+
+
+def _get_co2_log_times(project_id: int, db) -> set[datetime]:
+    """Return set of logged_at timestamps that have co2_psi values."""
+    rows = (
+        db.query(MeasurementLog.logged_at)
         .filter(
             MeasurementLog.project_id == project_id,
             MeasurementLog.co2_psi.isnot(None),
         )
-        .order_by(MeasurementLog.logged_at.desc())
-        .first()
+        .all()
     )
-    if latest:
-        return latest.co2_psi, latest.logged_at
-    return 0.0, None
+    result = set()
+    for (ts,) in rows:
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        result.add(ts)
+    return result
 
 
 # ── Core tick ─────────────────────────────────────────────────────────────────
@@ -91,27 +92,16 @@ def _tick():
         )
 
         for project in projects:
-            # Only supported fermentation types
             if project.fermentation_type.value not in SUPPORTED_TYPES:
                 continue
 
             start = project.start_date
-            # Make start timezone-aware if needed
             if start.tzinfo is None:
                 start = start.replace(tzinfo=timezone.utc)
 
             elapsed_hours = (now - start).total_seconds() / 3600.0
             if elapsed_hours < 0:
                 continue
-
-            # Skip if we logged in the last 25 seconds (avoid duplicates on restart)
-            _, last_logged_at = _get_latest_co2(project.id, db)
-            if last_logged_at:
-                if last_logged_at.tzinfo is None:
-                    last_logged_at = last_logged_at.replace(tzinfo=timezone.utc)
-                seconds_since_last = (now - last_logged_at).total_seconds()
-                if seconds_since_last < 25:
-                    continue
 
             strain_id = _resolve_strain(project, db)
             sugar_g = _estimate_sugar_g(project)
@@ -130,29 +120,41 @@ def _tick():
             except Exception:
                 continue
 
-            # Find the CER point closest to current elapsed time
-            closest = min(result.points, key=lambda p: abs(p.t - elapsed_hours))
+            existing_times = _get_co2_log_times(project.id, db)
 
-            # Cumulative CO2 up to this point
-            cumulative_co2 = sum(
-                p.cer * 0.5  # cer * dt
-                for p in result.points
-                if p.t <= elapsed_hours
+            # ── Backfill: one point per BACKFILL_INTERVAL_HOURS since start ──
+            h = BACKFILL_INTERVAL_HOURS
+            while h <= elapsed_hours:
+                candidate_ts = start + timedelta(hours=h)
+                # Check if we already have a reading within 10 minutes of this slot
+                already_logged = any(
+                    abs((candidate_ts - t).total_seconds()) < 600
+                    for t in existing_times
+                )
+                if not already_logged:
+                    psi = _psi_at_hours(result.points, h)
+                    db.add(MeasurementLog(
+                        project_id=project.id,
+                        logged_at=candidate_ts,
+                        co2_psi=psi,
+                        temperature_celsius=temp_c + random.uniform(-0.1, 0.1),
+                    ))
+                    existing_times.add(candidate_ts)
+                h += BACKFILL_INTERVAL_HOURS
+
+            # ── Live point: current moment ──
+            recent = any(
+                (now - t).total_seconds() < 25
+                for t in existing_times
             )
-
-            # Convert to PSI with small random noise for realism
-            co2_psi = round(
-                cumulative_co2 / CO2_TO_PSI + random.uniform(-0.05, 0.05),
-                2,
-            )
-            co2_psi = max(0.0, co2_psi)
-
-            db.add(MeasurementLog(
-                project_id=project.id,
-                logged_at=now,
-                co2_psi=co2_psi,
-                temperature_celsius=temp_c + random.uniform(-0.1, 0.1),
-            ))
+            if not recent:
+                psi = _psi_at_hours(result.points, elapsed_hours)
+                db.add(MeasurementLog(
+                    project_id=project.id,
+                    logged_at=now,
+                    co2_psi=psi,
+                    temperature_celsius=temp_c + random.uniform(-0.1, 0.1),
+                ))
 
         db.commit()
 
