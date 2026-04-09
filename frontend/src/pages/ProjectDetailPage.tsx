@@ -252,18 +252,18 @@ export default function ProjectDetailPage() {
               {(() => {
                 const maxMin = chartData.length > 0 ? Math.max(...chartData.map(d => d.minutesElapsed)) : 0
                 const useDays = maxMin >= 1440
-                const co2TickFormatter = (v: number) => {
+                const tickFormatter = (v: number) => {
                   if (useDays) return `${Math.round(v / 1440)}d`
                   if (v < 60) return `${v}m`
                   return `${Math.floor(v / 60)}h${v % 60 > 0 ? `${v % 60}m` : ''}`
                 }
                 return (
                   <XAxis
-                    dataKey={activeChart === 'co2' ? 'minutesElapsed' : 'date'}
-                    type={activeChart === 'co2' ? 'number' : 'category'}
-                    domain={activeChart === 'co2' ? ['auto', 'auto'] : undefined}
+                    dataKey="minutesElapsed"
+                    type="number"
+                    domain={['auto', 'auto']}
                     tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
-                    tickFormatter={activeChart === 'co2' ? co2TickFormatter : undefined}
+                    tickFormatter={tickFormatter}
                   />
                 )
               })()}
@@ -285,11 +285,7 @@ export default function ProjectDetailPage() {
                   activeChart === 'gravity' ? [value.toFixed(3), 'Specific Gravity'] :
                   [`${value} psi`, 'CO₂']
                 }
-                labelFormatter={(label) =>
-                  activeChart === 'co2'
-                    ? `${(label / 60).toFixed(1)} hours elapsed`
-                    : label
-                }
+                labelFormatter={(label) => `${(label / 60).toFixed(1)} hours elapsed`}
               />
               {activeChart === 'ph' && (
                 <Line type="monotone" dataKey="ph" name="pH" stroke="#4a6741" strokeWidth={2.5}
