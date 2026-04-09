@@ -249,13 +249,24 @@ export default function ProjectDetailPage() {
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-              <XAxis
-                dataKey={activeChart === 'co2' ? 'minutesElapsed' : 'date'}
-                type={activeChart === 'co2' ? 'number' : 'category'}
-                domain={activeChart === 'co2' ? ['auto', 'auto'] : undefined}
-                tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
-                tickFormatter={activeChart === 'co2' ? (v: number) => v < 60 ? `${v}m` : `${Math.floor(v / 60)}h${v % 60 > 0 ? `${v % 60}m` : ''}` : undefined}
-              />
+              {(() => {
+                const maxMin = chartData.length > 0 ? Math.max(...chartData.map(d => d.minutesElapsed)) : 0
+                const useDays = maxMin >= 1440
+                const co2TickFormatter = (v: number) => {
+                  if (useDays) return `${Math.round(v / 1440)}d`
+                  if (v < 60) return `${v}m`
+                  return `${Math.floor(v / 60)}h${v % 60 > 0 ? `${v % 60}m` : ''}`
+                }
+                return (
+                  <XAxis
+                    dataKey={activeChart === 'co2' ? 'minutesElapsed' : 'date'}
+                    type={activeChart === 'co2' ? 'number' : 'category'}
+                    domain={activeChart === 'co2' ? ['auto', 'auto'] : undefined}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                    tickFormatter={activeChart === 'co2' ? co2TickFormatter : undefined}
+                  />
+                )
+              })()}
               <YAxis
                 tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
                 domain={
@@ -273,6 +284,11 @@ export default function ProjectDetailPage() {
                   activeChart === 'ph' ? [`${value} pH`, 'pH'] :
                   activeChart === 'gravity' ? [value.toFixed(3), 'Specific Gravity'] :
                   [`${value} psi`, 'CO₂']
+                }
+                labelFormatter={(label) =>
+                  activeChart === 'co2'
+                    ? `${(label / 60).toFixed(1)} hours elapsed`
+                    : label
                 }
               />
               {activeChart === 'ph' && (
