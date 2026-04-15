@@ -56,12 +56,14 @@ def _estimate_sugar_g(project) -> float:
     return max(50.0, (og - 1.0) * 2500 * vol_l)
 
 
-def _get_co2_log_times(project_id: int, db) -> set:
+def _get_recent_co2_log_times(project_id: int, db, since: datetime) -> set:
+    """Return co2_psi timestamps only from `since` onward — keeps the set small."""
     rows = (
         db.query(MeasurementLog.logged_at)
         .filter(
             MeasurementLog.project_id == project_id,
             MeasurementLog.co2_psi.isnot(None),
+            MeasurementLog.logged_at >= since,
         )
         .all()
     )
@@ -183,7 +185,11 @@ def _tick():
                 phase       = state_row.phase,
             )
 
-            existing_times = _get_co2_log_times(project.id, db)
+            # Only look back far enough to cover the gap + a 10-min overlap buffer.
+            # This keeps the duplicate-check set small regardless of total history length.
+            lookback = max(gap_hours + (BACKFILL_INTERVAL_H * 2), 0.5)
+            since_ts = last_tick - timedelta(hours=lookback)
+            existing_times = _get_recent_co2_log_times(project.id, db, since_ts)
 
             # ── Advance simulation from last_tick → now ───────────────────────
             sim_elapsed   = 0.0
