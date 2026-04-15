@@ -1,5 +1,6 @@
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.database import get_db
 from app.models.models import YeastProfile, ProjectYeastConnection, FermentationProject, User, RecipeIngredient, Recipe
@@ -18,32 +19,45 @@ def list_yeasts(
         (YeastProfile.is_public == True) | (YeastProfile.creator_id == current_user.id)
     ).all()
 
+    if not yeasts:
+        return []
+
+    yeast_ids = [y.id for y in yeasts]
+
+    # Single bulk query for all user connections across every yeast
+    all_connections = (
+        db.query(ProjectYeastConnection)
+        .join(FermentationProject)
+        .options(joinedload(ProjectYeastConnection.project))
+        .filter(
+            ProjectYeastConnection.yeast_id.in_(yeast_ids),
+            FermentationProject.user_id == current_user.id,
+        )
+        .all()
+    )
+    connections_by_yeast: dict[int, list] = defaultdict(list)
+    for c in all_connections:
+        connections_by_yeast[c.yeast_id].append(c)
+
+    # Single bulk query for all linked recipes across every yeast
+    linked_rows = (
+        db.query(RecipeIngredient.yeast_profile_id, Recipe.id, Recipe.name)
+        .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
+        .filter(RecipeIngredient.yeast_profile_id.in_(yeast_ids))
+        .distinct()
+        .all()
+    )
+    recipes_by_yeast: dict[int, list] = defaultdict(list)
+    for row in linked_rows:
+        recipes_by_yeast[row.yeast_profile_id].append(RecipeRef(id=row.id, name=row.name))
+
     result = []
     for y in yeasts:
-        # Count times this user has used this yeast
-        connections = (
-            db.query(ProjectYeastConnection)
-            .join(FermentationProject)
-            .filter(
-                ProjectYeastConnection.yeast_id == y.id,
-                FermentationProject.user_id == current_user.id,
-            )
-            .all()
-        )
-        project_names = [UserProjectRef(id=c.project.id, name=c.project.name) for c in connections if c.project]
-
-        linked = (
-            db.query(Recipe)
-            .join(RecipeIngredient, RecipeIngredient.recipe_id == Recipe.id)
-            .filter(RecipeIngredient.yeast_profile_id == y.id)
-            .distinct()
-            .all()
-        )
-
+        conns = connections_by_yeast[y.id]
         yeast_out = YeastProfileOut.model_validate(y)
-        yeast_out.times_used = len(connections)
-        yeast_out.user_projects = project_names
-        yeast_out.linked_recipes = [RecipeRef(id=r.id, name=r.name) for r in linked]
+        yeast_out.times_used = len(conns)
+        yeast_out.user_projects = [UserProjectRef(id=c.project.id, name=c.project.name) for c in conns if c.project]
+        yeast_out.linked_recipes = recipes_by_yeast[y.id]
         result.append(yeast_out)
 
     return result
