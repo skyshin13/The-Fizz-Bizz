@@ -216,7 +216,7 @@ def _tick():
                         db.add(MeasurementLog(
                             project_id          = project.id,
                             logged_at           = candidate_ts,
-                            co2_psi             = round(display_psi + noise(), 3),
+                            co2_psi             = round(max(0.0, display_psi + noise()), 3),
                             temperature_celsius = state_row.temperature_c + random.uniform(-0.1, 0.1),
                         ))
                         existing_times.add(candidate_ts)
