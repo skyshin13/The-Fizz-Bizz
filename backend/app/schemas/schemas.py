@@ -417,6 +417,41 @@ class CERResponse(BaseModel):
     total_co2_mg_per_L: float
 
 
+# ─── Live CER (stateful, persistent) ────────────────────────────────────────
+
+class LiveCERPointOut(BaseModel):
+    hours_elapsed: float
+    co2_psi: float
+    timestamp: str          # ISO-8601
+
+
+class LiveCERStateOut(BaseModel):
+    current_psi: float
+    current_phase: str
+    current_cer_estimate: float     # mg/L/h instantaneous
+    elapsed_hours: float
+    strain_id: str
+    strain_name: str
+    sugar_g: float
+    volume_ml: float
+    temperature_c: float
+    X: float                        # biomass g/L
+    S: float                        # substrate g/L remaining
+
+
+class LiveCERResponse(BaseModel):
+    points: List[LiveCERPointOut]
+    state: Optional[LiveCERStateOut] = None
+    start_date: Optional[str] = None
+
+
+class CERParamsUpdate(BaseModel):
+    strain_id: Optional[str] = None
+    sugar_g: Optional[float] = None
+    volume_ml: Optional[float] = None
+    temperature_c: Optional[float] = None
+
+
 # ─── Social Schemas ───────────────────────────────────────────────────────────
 
 class PublicUserOut(BaseModel):

@@ -272,3 +272,36 @@ class Friendship(Base):
 
     requester = relationship("User", foreign_keys=[requester_id], back_populates="sent_requests")
     receiver = relationship("User", foreign_keys=[receiver_id], back_populates="received_requests")
+
+
+class ProjectCERState(Base):
+    """
+    Persistent fermentation simulation state for stateful CO₂ tracking.
+    One row per project. Updated every 30 s by live_cer_task.
+    Survives server restarts: the next tick backfills the offline gap automatically.
+    """
+    __tablename__ = "project_cer_states"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    project_id   = Column(Integer, ForeignKey("fermentation_projects.id"), unique=True, nullable=False)
+
+    # Simulation parameters (tunable by the user via PATCH /calculations/cer-params)
+    strain_id    = Column(String,  default="US-05")
+    sugar_g      = Column(Float,   default=200.0)
+    volume_ml    = Column(Float,   default=5000.0)
+    temperature_c = Column(Float,  default=20.0)
+
+    # Simulation state persisted between ticks
+    X            = Column(Float,  default=0.05)   # biomass g/L
+    S            = Column(Float,  default=40.0)   # substrate g/L remaining
+    ethanol_est  = Column(Float,  default=0.0)    # estimated ethanol g/L
+    elapsed_t    = Column(Float,  default=0.0)    # hours since project start at last tick
+    phase        = Column(String, default="lag")
+
+    last_tick_at = Column(DateTime(timezone=True), nullable=True)
+
+    # CO₂ pressure accounting
+    psi_cumulative = Column(Float, default=0.0)   # total PSI ever produced
+    psi_released   = Column(Float, default=0.0)   # total PSI removed by CO₂ release events
+
+    project = relationship("FermentationProject", uselist=False)

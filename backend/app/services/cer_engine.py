@@ -324,3 +324,96 @@ def simulate_cer(
         strain_name=strain.name,
         total_co2_mg_per_L=round(total_co2, 2),
     )
+
+
+# ─── Stateful simulation (persistent across server restarts) ─────────────────
+
+@dataclass
+class CERState:
+    X: float            # biomass g/L
+    S: float            # substrate g/L
+    ethanol_est: float  # accumulated ethanol g/L
+    elapsed_t: float    # hours since fermentation start
+    phase: str = "lag"
+
+
+def initial_cer_state(strain_id: str, sugar_g: float, volume_ml: float) -> CERState:
+    """Create the t=0 fermentation state for a given strain and batch."""
+    strain = STRAIN_MAP.get(strain_id) or STRAIN_MAP["US-05"]
+    S0 = sugar_g / max(volume_ml / 1000.0, 0.001)
+    return CERState(X=strain.X0, S=S0, ethanol_est=0.0, elapsed_t=0.0, phase="lag")
+
+
+def step_cer(
+    strain_id: str,
+    state: CERState,
+    temp_c: float,
+    dt: float = 0.5,
+) -> tuple[CERState, float]:
+    """
+    Advance the fermentation simulation by dt hours.
+    Returns (new_state, cer_mg_L_h).
+    All four growth phases use the same governing equations as simulate_cer(),
+    so results are consistent whether computed in one batch or tick-by-tick.
+    """
+    strain = STRAIN_MAP.get(strain_id) or STRAIN_MAP["US-05"]
+
+    tf           = temp_factor(strain, temp_c)
+    mu_eff_base  = strain.mu_max * tf
+    scale        = max(tf, 0.05)
+
+    t_lag  = strain.t_lag
+    t_exp  = strain.t_lag  + (strain.t_exp  - strain.t_lag) / scale
+    t_stat = t_exp         + (strain.t_stat - strain.t_exp)
+    EtOH_tol_g_L = strain.ethanol_tol * 0.789 * 10.0
+
+    t           = state.elapsed_t
+    X           = state.X
+    S           = state.S
+    ethanol_est = state.ethanol_est
+
+    if t < t_lag:
+        phase   = "lag"
+        mu_ferm = 0.0
+
+    elif t < t_exp:
+        phase = "exponential"
+        sf    = sugar_factor(S)
+        mu    = mu_eff_base * sf
+        if ethanol_est > EtOH_tol_g_L:
+            mu *= 0.05
+        dX    = mu * X * dt
+        X_new = min(X + dX, strain.X_max)
+        dX    = X_new - X
+        dS    = -dX / 0.5
+        S     = max(0.0, S + dS)
+        ethanol_est += abs(dS) * 0.51
+        X           = X_new
+        mu_ferm     = mu
+
+    elif t < t_stat:
+        phase   = "stationary"
+        X       = strain.X_max
+        mu_ferm = mu_eff_base * 0.12 * sugar_factor(S)
+        dS      = -mu_ferm * X * dt / 0.5
+        S       = max(0.0, S + dS)
+        ethanol_est += abs(dS) * 0.51
+
+    else:
+        phase   = "decline"
+        X       = strain.X_max * math.exp(-strain.k_d * (t - t_stat))
+        mu_ferm = mu_eff_base * 0.04 * sugar_factor(S)
+        dS      = -mu_ferm * X * dt / 0.5
+        S       = max(0.0, S + dS)
+        ethanol_est += abs(dS) * 0.51
+
+    cer = mu_ferm * X * 0.49 * 1000.0  # mg/L/h
+
+    new_state = CERState(
+        X=round(max(0.0, X), 6),
+        S=round(max(0.0, S), 6),
+        ethanol_est=round(ethanol_est, 6),
+        elapsed_t=round(t + dt, 4),
+        phase=phase,
+    )
+    return new_state, round(max(0.0, cer), 4)

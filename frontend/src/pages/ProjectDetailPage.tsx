@@ -402,8 +402,7 @@ export default function ProjectDetailPage() {
         {activeTab === 'cer' && isAlcohol && (
           <div style={{ padding: '1.5rem' }}>
             <CERTab
-              initialTemp={project.fermentation_temp_celsius ?? 20}
-              yeastStrainId={project.yeast_strain?.name}
+              projectId={parseInt(id!)}
               startDate={project.start_date}
             />
           </div>
@@ -728,107 +727,108 @@ function friendlyInterval(hours: number): string {
   return `Every ${hours} hour${hours !== 1 ? 's' : ''}`
 }
 
-// ─── CER Tab ─────────────────────────────────────────────────────────────────
+// ─── CER Tab (stateful, persistent) ──────────────────────────────────────────
 
-interface CERStrain { id: string; name: string; strain_type: string; brand: string; opt_temp_c: number; temp_min_c: number; temp_max_c: number; ethanol_tol: number; description: string }
-interface CERPoint  { t: number; cer: number; phase: string }
-interface CERResult { points: CERPoint[]; peak_cer: number; peak_t: number; alert_triggered: boolean; alert_t: number | null; strain_id: string; strain_name: string; total_co2_mg_per_L: number }
+interface CERStrain    { id: string; name: string; strain_type: string; brand: string; opt_temp_c: number; temp_min_c: number; temp_max_c: number; ethanol_tol: number; description: string }
+interface LiveCERPoint { hours_elapsed: number; co2_psi: number; timestamp: string }
+interface LiveCERState { current_psi: number; current_phase: string; current_cer_estimate: number; elapsed_hours: number; strain_id: string; strain_name: string; sugar_g: number; volume_ml: number; temperature_c: number; X: number; S: number }
 
 const TYPE_LABELS: Record<string, string> = { ale: 'Ale', lager: 'Lager', wheat: 'Wheat', wine: 'Wine', champagne: 'Champagne', saison: 'Saison', wild: 'Wild / Belgian' }
+const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59e0b', stationary: '#10b981', decline: '#ef4444' }
 const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
 const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
 
-function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number; yeastStrainId?: string; startDate?: string }) {
-  const [strains, setStrains] = useState<CERStrain[]>([])
+function CERTab({ projectId, startDate }: { projectId: number; startDate?: string }) {
+  const [strains, setStrains]           = useState<CERStrain[]>([])
   const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
   const [strainSearch, setStrainSearch] = useState('')
-  const [showList, setShowList] = useState(false)
+  const [showList, setShowList]         = useState(false)
+  const [showInfo, setShowInfo]         = useState(false)
 
+  // Editable params (initialised from backend state on first load)
   const [sugar, setSugar]         = useState('200')
   const [volume, setVolume]       = useState('5000')
-  const [temp, setTemp]           = useState(String(initialTemp))
-  const [threshold, setThreshold] = useState('150')
+  const [temp, setTemp]           = useState('20')
+  const [threshold, setThreshold] = useState('150')  // CER alert in mg/L/h (frontend-only)
 
-  const [result, setResult]       = useState<CERResult | null>(null)
-  const [displayed, setDisplayed] = useState<CERPoint[]>([])
-  const [loading, setLoading]     = useState(false)
-  const [showInfo, setShowInfo]   = useState(false)
-  const [liveMode, setLiveMode]   = useState(false)
-  const [liveIdx, setLiveIdx]     = useState(0)
-  const animRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Live data from the database
+  const [points, setPoints]       = useState<LiveCERPoint[]>([])
+  const [liveState, setLiveState] = useState<LiveCERState | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [releasing, setReleasing] = useState(false)
+  const [patching, setPatching]   = useState(false)
+  const initialised               = useRef(false)
 
-  // Duration = hours since project start, minimum 48h, maximum 240h
-  const durationHours = startDate
-    ? Math.min(240, Math.max(48, Math.ceil((Date.now() - new Date(startDate).getTime()) / 3600000)))
-    : 120
-
-  const run = (strain: CERStrain, sg: string, vol: string, t: string) => {
-    if (animRef.current) clearInterval(animRef.current)
-    setDisplayed([]); setResult(null); setLoading(true)
-    api.post('/calculations/cer', {
-      strain_id: strain.id,
-      sugar_g: parseFloat(sg) || 200,
-      volume_ml: parseFloat(vol) || 5000,
-      temperature_c: parseFloat(t) || initialTemp,
-      duration_hours: durationHours,
-      alert_threshold: parseFloat(threshold) || 150,
-    }).then(res => {
-      const data: CERResult = res.data
-      setResult(data)
-      // Start live mode from index 0 — graph builds point by point every 10 min
-      setLiveIdx(1)
-      setDisplayed([])
-      setLiveMode(true)
-    }).catch(() => toast.error('Could not load CO₂ data'))
-    .finally(() => setLoading(false))
+  // ── Fetch live data from database ──────────────────────────────────────────
+  const fetchData = async () => {
+    try {
+      const res = await api.get(`/calculations/live-cer/${projectId}`)
+      setPoints(res.data.points ?? [])
+      setLiveState(res.data.state ?? null)
+      setLastUpdated(new Date())
+      // Sync controls from backend state on first load only
+      if (!initialised.current && res.data.state) {
+        const s: LiveCERState = res.data.state
+        setSugar(String(Math.round(s.sugar_g)))
+        setVolume(String(Math.round(s.volume_ml)))
+        setTemp(String(s.temperature_c))
+        initialised.current = true
+      }
+    } catch { /* silent — offline */ }
+    finally { setLoading(false) }
   }
 
-  // Load strains once, then auto-run
+  // Load strains once (for picker)
   useEffect(() => {
-    api.get('/calculations/cer-strains').then(r => {
-      const list: CERStrain[] = r.data
-      setStrains(list)
-      const match = yeastStrainId
-        ? list.find(s => s.name.toLowerCase().includes(yeastStrainId.toLowerCase())) ?? list.find(s => s.id === 'US-05')
-        : list.find(s => s.id === 'US-05')
-      if (match) { setSelectedStrain(match); run(match, sugar, volume, temp) }
-    }).catch(() => {})
+    api.get('/calculations/cer-strains').then(r => setStrains(r.data)).catch(() => {})
   }, [])
 
-  // Live mode: advance one data point every 10 minutes
+  // Sync selectedStrain display whenever liveState or strains list changes
   useEffect(() => {
-    if (!liveMode || !result) return
-    if (liveIdx >= result.points.length) { setLiveMode(false); return }
-    const t = setTimeout(() => setLiveIdx(i => i + 1), 1000)
-    return () => clearTimeout(t)
-  }, [liveMode, liveIdx, result])
+    if (liveState && strains.length > 0) {
+      const match = strains.find(s => s.id === liveState.strain_id)
+      if (match) setSelectedStrain(match)
+    }
+  }, [liveState?.strain_id, strains])
 
-  // Sync displayed with liveIdx while live
+  // Poll every 30 s — matches backend tick interval
   useEffect(() => {
-    if (liveMode && result) setDisplayed(result.points.slice(0, liveIdx))
-  }, [liveMode, liveIdx, result])
+    fetchData()
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
+  }, [projectId])
 
-  const startLive = (data: CERResult) => {
-    if (animRef.current) clearInterval(animRef.current)
-    setLiveIdx(1)
-    setDisplayed([])
-    setLiveMode(true)
+  // ── Send updated params to backend ─────────────────────────────────────────
+  const patchParams = async (overrides?: { strain_id?: string }) => {
+    setPatching(true)
+    try {
+      await api.patch(`/calculations/cer-params/${projectId}`, {
+        strain_id:    overrides?.strain_id ?? selectedStrain?.id,
+        sugar_g:      parseFloat(sugar)  || undefined,
+        volume_ml:    parseFloat(volume) || undefined,
+        temperature_c: parseFloat(temp)  || undefined,
+      })
+      await fetchData()
+    } catch { toast.error('Could not update simulation params') }
+    finally { setPatching(false) }
   }
 
-  const stopLive = () => {
-    setLiveMode(false)
-    if (result) setDisplayed(result.points)
+  // ── CO₂ release ────────────────────────────────────────────────────────────
+  const handleRelease = async () => {
+    setReleasing(true)
+    try {
+      await api.post(`/calculations/co2-release/${projectId}`)
+      await fetchData()
+      toast.success('CO₂ released — pressure reset to 0')
+    } catch { toast.error('Could not record CO₂ release') }
+    finally { setReleasing(false) }
   }
 
-  const releaseCO2 = () => {
-    if (animRef.current) clearInterval(animRef.current)
-    setLiveIdx(1)
-    setDisplayed([])
-    setLiveMode(true)
-  }
-
-  // Re-run when user changes inputs (debounced via blur)
-  const rerun = () => { if (selectedStrain) run(selectedStrain, sugar, volume, temp) }
+  // Derived values
+  const alertNum     = parseFloat(threshold) || 150
+  const isAlerting   = (liveState?.current_cer_estimate ?? 0) > alertNum
+  const secsSincePoll = lastUpdated ? Math.round((Date.now() - lastUpdated.getTime()) / 1000) : null
 
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
@@ -836,16 +836,18 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
     s.brand.toLowerCase().includes(strainSearch.toLowerCase())
   )
   const grouped: Record<string, CERStrain[]> = {}
-  for (const s of filtered) { if (!grouped[s.strain_type]) grouped[s.strain_type] = []; grouped[s.strain_type].push(s) }
-
-  const alertNum = parseFloat(threshold) || 150
+  for (const s of filtered) {
+    if (!grouped[s.strain_type]) grouped[s.strain_type] = []
+    grouped[s.strain_type].push(s)
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.5rem' }}>
-      {/* Controls */}
+
+      {/* ── Controls ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Live CO₂ evolution rate for this project. Adjust inputs to update the curve.
+          Persistent CO₂ simulation — continues across restarts. Backfills any offline gap automatically.
         </p>
 
         {/* Strain picker */}
@@ -853,7 +855,7 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
           <label style={cerLabel}>Yeast Strain</label>
           <div onClick={() => setShowList(v => !v)} style={{ ...cerInput, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '0.8rem', color: selectedStrain ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-              {selectedStrain ? selectedStrain.name : 'Select…'}
+              {selectedStrain ? selectedStrain.name : (liveState?.strain_name ?? 'Select…')}
             </span>
             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>▼</span>
           </div>
@@ -872,7 +874,12 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
                   </div>
                   {list.map(s => (
                     <div key={s.id}
-                      onClick={() => { setSelectedStrain(s); setShowList(false); setStrainSearch(''); run(s, sugar, volume, temp) }}
+                      onClick={() => {
+                        setSelectedStrain(s)
+                        setShowList(false)
+                        setStrainSearch('')
+                        patchParams({ strain_id: s.id })
+                      }}
                       style={{ padding: '0.5rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', background: selectedStrain?.id === s.id ? 'var(--brown-dark)' : 'transparent' }}>
                       <div style={{ fontWeight: 500 }}>{s.name}</div>
                       <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{s.brand}</div>
@@ -884,90 +891,85 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
           )}
         </div>
 
-        <div><label style={cerLabel}>Sugar (g)</label><input type="number" step="10" value={sugar} onChange={e => setSugar(e.target.value)} onBlur={rerun} style={cerInput} /></div>
-        <div><label style={cerLabel}>Volume (mL)</label><input type="number" step="100" value={volume} onChange={e => setVolume(e.target.value)} onBlur={rerun} style={cerInput} /></div>
-        <div><label style={cerLabel}>Temperature (°C)</label><input type="number" step="0.5" value={temp} onChange={e => setTemp(e.target.value)} onBlur={rerun} style={cerInput} /></div>
+        <div><label style={cerLabel}>Sugar (g)</label>
+          <input type="number" step="10" value={sugar} onChange={e => setSugar(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
+        </div>
+        <div><label style={cerLabel}>Volume (mL)</label>
+          <input type="number" step="100" value={volume} onChange={e => setVolume(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
+        </div>
+        <div><label style={cerLabel}>Temperature (°C)</label>
+          <input type="number" step="0.5" value={temp} onChange={e => setTemp(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
+        </div>
         <div>
-          <label style={cerLabel}>Alert Threshold (mg/L/h)</label>
-          <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} onBlur={rerun} style={cerInput} />
+          <label style={cerLabel}>CER Alert (mg/L/h)</label>
+          <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} style={cerInput} />
         </div>
 
-        {result && (
-          <button
-            onClick={releaseCO2}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #b54a2c60', background: '#b54a2c14', color: 'var(--rust)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#b54a2c25' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#b54a2c14' }}
-          >
-            <Wind size={14} />
-            Release CO₂
-          </button>
-        )}
+        <button
+          onClick={handleRelease}
+          disabled={releasing || !liveState}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #b54a2c60', background: releasing ? '#b54a2c08' : '#b54a2c14', color: 'var(--rust)', fontSize: '0.8rem', fontWeight: 600, cursor: releasing ? 'default' : 'pointer', transition: 'all 0.15s', opacity: releasing ? 0.6 : 1 }}
+          onMouseEnter={e => { if (!releasing) (e.currentTarget as HTMLButtonElement).style.background = '#b54a2c25' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = releasing ? '#b54a2c08' : '#b54a2c14' }}
+        >
+          <Wind size={14} />
+          {releasing ? 'Releasing…' : 'Release CO₂'}
+        </button>
 
         <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
-          Showing {durationHours}h window · Updates on input change
+          {patching ? 'Saving…' : secsSincePoll !== null ? `Updated ${secsSincePoll}s ago` : 'Loading…'}
         </p>
       </div>
 
-      {/* Chart + stats */}
+      {/* ── Chart + stats ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {displayed.some(p => p.cer > alertNum) && (
+
+        {/* Alert banner */}
+        {isAlerting && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem 1rem', background: '#b54a2c18', border: '1px solid #b54a2c50', borderRadius: '10px', color: 'var(--rust)' }}>
             <AlertTriangle size={16} style={{ flexShrink: 0 }} />
             <div>
               <strong style={{ fontSize: '0.875rem' }}>Pressure Alert</strong>
-              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>CER has exceeded {threshold} mg/L/h. Release pressure from your jar.</p>
+              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>CER is {liveState!.current_cer_estimate.toFixed(1)} mg/L/h — above your {threshold} threshold. Release CO₂ from your jar.</p>
             </div>
           </div>
         )}
 
         <style>{`@keyframes cer-live-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
-        <div style={{ background: 'var(--warm-white)', borderRadius: '10px', padding: '1rem', border: `1px solid ${liveMode ? '#ef444440' : 'var(--border-light)'}`, transition: 'border-color 0.3s' }}>
+        <div style={{ background: 'var(--warm-white)', borderRadius: '10px', padding: '1rem', border: '1px solid #ef444440', transition: 'border-color 0.3s' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CO₂ Evolution Rate</span>
-              {liveMode && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', fontWeight: 700, color: '#ef4444', background: '#ef444415', border: '1px solid #ef444440', borderRadius: 20, padding: '0.1rem 0.45rem' }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'cer-live-pulse 1.4s ease-in-out infinite' }} />
-                  LIVE
-                </span>
-              )}
-              {liveMode && result && (
-                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
-                  Hour {result.points[Math.min(liveIdx, result.points.length - 1)]?.t.toFixed(1) ?? 0} of {result.points.at(-1)?.t ?? 0}h
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CO₂ Pressure (PSI)</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', fontWeight: 700, color: '#ef4444', background: '#ef444415', border: '1px solid #ef444440', borderRadius: 20, padding: '0.1rem 0.45rem' }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'cer-live-pulse 1.4s ease-in-out infinite' }} />
+                LIVE
+              </span>
+              {liveState && (
+                <span style={{ fontSize: '0.62rem', color: PHASE_COLOR[liveState.current_phase] ?? 'var(--text-muted)', fontWeight: 600, textTransform: 'capitalize' }}>
+                  {liveState.current_phase}
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              {result && (
-                <button
-                  onClick={() => liveMode ? stopLive() : startLive(result)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.625rem', borderRadius: 20, border: `1px solid ${liveMode ? '#ef444450' : 'var(--amber)'}`, background: liveMode ? '#ef444412' : '#f59e0b15', color: liveMode ? '#ef4444' : 'var(--amber)', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
-                >
-                  {liveMode ? '⏹ Exit Live' : '▶ Go Live'}
-                </button>
-              )}
-              <button
-                onClick={() => setShowInfo(v => !v)}
-                title="How is this calculated?"
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 20, border: `1px solid ${showInfo ? 'var(--amber)' : 'var(--border)'}`, background: showInfo ? '#f59e0b18' : 'transparent', color: showInfo ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', transition: 'all 0.15s' }}
-              >
-                <Info size={11} /> How is this calculated?
-              </button>
-            </div>
+            <button
+              onClick={() => setShowInfo(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 20, border: `1px solid ${showInfo ? 'var(--amber)' : 'var(--border)'}`, background: showInfo ? '#f59e0b18' : 'transparent', color: showInfo ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', transition: 'all 0.15s' }}
+            >
+              <Info size={11} /> How is this calculated?
+            </button>
           </div>
 
           {showInfo && (
             <div style={{ marginBottom: '0.875rem', padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-              <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>How CO₂ Evolution Rate is calculated</strong>
-              <p style={{ margin: '0.4rem 0 0.2rem' }}>The graph models CER using:</p>
+              <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>Persistent stateful fermentation model</strong>
+              <p style={{ margin: '0.4rem 0 0.2rem' }}>PSI accumulates from the governing equation:</p>
               <div style={{ fontFamily: 'monospace', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 0.625rem', margin: '0.4rem 0', fontSize: '0.75rem', color: 'var(--amber)' }}>
-                CER(t) = μ(t) × X(t) × 0.49 × 1000 &nbsp;[mg CO₂/L/h]
+                CER(t) = μ(t) × X(t) × 0.49 × 1000 [mg CO₂/L/h]
               </div>
               <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                <li><strong>μ(t)</strong> — yeast growth rate, adjusted for temperature (bell-curve vs. strain range), sugar (Monod kinetics), and ethanol inhibition</li>
-                <li><strong>X(t)</strong> — estimated yeast biomass g/L at time t</li>
-                <li><strong>0.49</strong> — CO₂ yield coefficient (g CO₂ per g biomass)</li>
+                <li>State (X, S, phase) is persisted in the database every 30 s</li>
+                <li>Offline gaps are backfilled automatically on restart</li>
+                <li>CO₂ Release drops PSI to 0 and creates a new accumulation trajectory</li>
+                <li>X-axis = real elapsed hours since project start</li>
               </ul>
               <p style={{ margin: '0.6rem 0 0.2rem' }}><strong>Phases: </strong>
                 <span style={{ color: '#94a3b8' }}>Lag</span> → <span style={{ color: '#f59e0b' }}>Exponential</span> → <span style={{ color: '#10b981' }}>Stationary</span> → <span style={{ color: '#ef4444' }}>Decline</span>
@@ -978,29 +980,53 @@ function CERTab({ initialTemp, yeastStrainId, startDate }: { initialTemp: number
           {loading && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem' }}>
               <Wind size={30} style={{ opacity: 0.2 }} />
-              <p style={{ fontSize: '0.8rem' }}>Calculating…</p>
+              <p style={{ fontSize: '0.8rem' }}>Loading simulation data…</p>
             </div>
           )}
-          {!loading && (
+
+          {!loading && points.length === 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem', flexDirection: 'column' }}>
+              <Wind size={30} style={{ opacity: 0.2 }} />
+              <p style={{ fontSize: '0.8rem', margin: 0 }}>Simulation starting…</p>
+              <p style={{ fontSize: '0.72rem', margin: 0, opacity: 0.6 }}>First data point arrives within 30 seconds.</p>
+            </div>
+          )}
+
+          {!loading && points.length > 0 && (
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={displayed} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="t" tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'Time (h)', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} tickCount={8} domain={[0, displayed.length > 0 ? displayed.at(-1)!.t : 2]} type="number" />
-                <YAxis tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }} label={{ value: 'CER (mg/L/h)', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }} />
-                <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }} formatter={(v: number) => [`${v.toFixed(2)} mg/L/h`, 'CER']} labelFormatter={(t: number) => `Hour ${t}`} />
-                <ReferenceLine y={alertNum} stroke="var(--rust)" strokeDasharray="5 3" label={{ value: `Alert ${alertNum}`, position: 'insideTopRight', style: { fontSize: '0.65rem', fill: 'var(--rust)' } }} />
-                <Line type="monotone" dataKey="cer" stroke="var(--amber)" strokeWidth={2} dot={false} isAnimationActive={false} />
+                <XAxis
+                  dataKey="hours_elapsed"
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                  tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
+                  label={{ value: 'Hours elapsed', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
+                  tickCount={8}
+                  tickFormatter={(v: number) => `${v.toFixed(0)}h`}
+                />
+                <YAxis
+                  tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
+                  label={{ value: 'PSI', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }}
+                  formatter={(v: number) => [`${v.toFixed(3)} PSI`, 'CO₂ Pressure']}
+                  labelFormatter={(h: number) => `Hour ${h.toFixed(1)} since start`}
+                />
+                <Line type="monotone" dataKey="co2_psi" stroke="var(--amber)" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {result && (
+        {/* Stat cards */}
+        {liveState && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
             {[
-              { label: 'Peak CER', value: `${result.peak_cer.toFixed(1)}`, unit: 'mg/L/h' },
-              { label: 'Peak at', value: `${result.peak_t}h`, unit: 'into fermentation' },
-              { label: 'Total CO₂', value: `${result.total_co2_mg_per_L.toFixed(0)}`, unit: 'mg/L cumulative' },
+              { label: 'Current PSI',  value: liveState.current_psi.toFixed(3),              unit: 'vessel pressure' },
+              { label: 'CER estimate', value: liveState.current_cer_estimate.toFixed(1),     unit: 'mg/L/h now' },
+              { label: 'Elapsed',      value: `${liveState.elapsed_hours.toFixed(1)}h`,      unit: `${liveState.current_phase} phase` },
             ].map(({ label, value, unit }) => (
               <div key={label} style={{ padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                 <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
