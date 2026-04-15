@@ -123,7 +123,7 @@ def get_live_cer(
         hours = (ts - start).total_seconds() / 3600.0 if start else 0.0
         points.append(LiveCERPointOut(
             hours_elapsed=round(hours, 3),
-            co2_psi=round(m.co2_psi, 3),
+            co2_psi=round(max(0.0, m.co2_psi), 3),
             timestamp=ts.isoformat(),
         ))
 
