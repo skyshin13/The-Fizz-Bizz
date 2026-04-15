@@ -760,6 +760,11 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   const [patching, setPatching]   = useState(false)
   const initialised               = useRef(false)
 
+  // Zoom window: 'all' or last-N-hours
+  const [viewHours, setViewHours]       = useState<number | 'all'>('all')
+  const [customHours, setCustomHours]   = useState('12')
+  const [showCustom, setShowCustom]     = useState(false)
+
   // ── Fetch live data from database ──────────────────────────────────────────
   const fetchData = async () => {
     try {
@@ -826,9 +831,16 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   }
 
   // Derived values
-  const alertNum     = parseFloat(threshold) || 150
-  const isAlerting   = (liveState?.current_cer_estimate ?? 0) > alertNum
+  const alertNum      = parseFloat(threshold) || 150
+  const isAlerting    = (liveState?.current_cer_estimate ?? 0) > alertNum
   const secsSincePoll = lastUpdated ? Math.round((Date.now() - lastUpdated.getTime()) / 1000) : null
+
+  // Zoom: slice points and compute X-axis domain for the selected window
+  const maxH = points.length > 0 ? points[points.length - 1].hours_elapsed : 0
+  const windowH = viewHours === 'all' ? null : (viewHours === -1 ? (parseFloat(customHours) || 12) : viewHours)
+  const minH    = windowH !== null ? Math.max(0, maxH - windowH) : 0
+  const visiblePoints = windowH !== null ? points.filter(p => p.hours_elapsed >= minH) : points
+  const xDomain: [number | string, number | string] = windowH !== null ? [minH, maxH] : ['dataMin', 'dataMax']
 
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
@@ -950,12 +962,45 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
                 </span>
               )}
             </div>
-            <button
-              onClick={() => setShowInfo(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 20, border: `1px solid ${showInfo ? 'var(--amber)' : 'var(--border)'}`, background: showInfo ? '#f59e0b18' : 'transparent', color: showInfo ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', transition: 'all 0.15s' }}
-            >
-              <Info size={11} /> How is this calculated?
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              {/* ── Zoom window selector ── */}
+              {([['all', 'All'], [6, '6h'], [24, '24h'], [48, '48h'], [-1, 'Custom']] as [number | 'all', string][]).map(([val, label]) => {
+                const active = val === -1 ? showCustom : viewHours === val && !showCustom
+                return (
+                  <button key={String(val)}
+                    onClick={() => {
+                      if (val === -1) {
+                        setShowCustom(v => !v)
+                      } else {
+                        setShowCustom(false)
+                        setViewHours(val)
+                      }
+                    }}
+                    style={{ padding: '0.2rem 0.5rem', borderRadius: 20, border: `1px solid ${active ? 'var(--amber)' : 'var(--border)'}`, background: active ? '#f59e0b18' : 'transparent', color: active ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.65rem', fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+              {showCustom && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customHours}
+                    onChange={e => { setCustomHours(e.target.value); setViewHours(-1) }}
+                    style={{ width: 46, padding: '0.18rem 0.4rem', border: '1px solid var(--amber)', borderRadius: 6, background: 'var(--warm-white)', fontSize: '0.7rem', color: 'var(--text-primary)', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>h</span>
+                </div>
+              )}
+              <button
+                onClick={() => setShowInfo(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 20, border: `1px solid ${showInfo ? 'var(--amber)' : 'var(--border)'}`, background: showInfo ? '#f59e0b18' : 'transparent', color: showInfo ? 'var(--amber)' : 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <Info size={11} />
+              </button>
+            </div>
           </div>
 
           {showInfo && (
@@ -994,16 +1039,17 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
 
           {!loading && points.length > 0 && (
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <LineChart data={visiblePoints} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="hours_elapsed"
                   type="number"
-                  domain={['dataMin', 'dataMax']}
+                  domain={xDomain}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
-                  label={{ value: 'Hours elapsed', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
+                  label={{ value: windowH !== null ? `Last ${windowH.toFixed(0)}h` : 'Hours elapsed', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
                   tickCount={8}
                   tickFormatter={(v: number) => `${v.toFixed(0)}h`}
+                  allowDataOverflow
                 />
                 <YAxis
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
