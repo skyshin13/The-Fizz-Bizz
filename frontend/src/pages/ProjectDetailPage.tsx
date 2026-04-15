@@ -800,7 +800,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   // Poll every 30 s — matches backend tick interval
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 30000)
+    const interval = setInterval(fetchData, 5000)
     return () => clearInterval(interval)
   }, [projectId])
 
@@ -1033,7 +1033,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem', flexDirection: 'column' }}>
               <Wind size={30} style={{ opacity: 0.2 }} />
               <p style={{ fontSize: '0.8rem', margin: 0 }}>Simulation starting…</p>
-              <p style={{ fontSize: '0.72rem', margin: 0, opacity: 0.6 }}>First data point arrives within 30 seconds.</p>
+              <p style={{ fontSize: '0.72rem', margin: 0, opacity: 0.6 }}>First data point arrives within 5 seconds.</p>
             </div>
           )}
 

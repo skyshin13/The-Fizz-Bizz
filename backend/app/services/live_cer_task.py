@@ -30,7 +30,7 @@ from app.services.cer_engine import (
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-INTERVAL_SECONDS    = 30
+INTERVAL_SECONDS    = 5
 CO2_TO_PSI          = 300.0     # converts Σ(cer·dt) → PSI
 DEFAULT_STRAIN      = "US-05"
 SUPPORTED_TYPES     = {"beer", "mead", "cider", "wine", "alcohol_brewing"}
@@ -223,7 +223,7 @@ def _tick():
                     last_backfill = sim_elapsed
 
             # ── Live point at now ─────────────────────────────────────────────
-            recent = any((now - t).total_seconds() < 25 for t in existing_times)
+            recent = any((now - t).total_seconds() < 4 for t in existing_times)
             if not recent:
                 display_psi = max(0.0, state_row.psi_cumulative - state_row.psi_released)
                 db.add(MeasurementLog(
