@@ -486,6 +486,35 @@ class PublicProjectOut(BaseModel):
         from_attributes = True
 
 
+class SharedMeasurementOut(BaseModel):
+    logged_at: datetime
+    ph: Optional[float] = None
+    specific_gravity: Optional[float] = None
+    alcohol_by_volume: Optional[float] = None
+    co2_psi: Optional[float] = None
+    temperature_celsius: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SharedProjectOut(BaseModel):
+    id: int
+    name: str
+    fermentation_type: FermentationType
+    status: ProjectStatus
+    description: Optional[str] = None
+    cover_photo_url: Optional[str] = None
+    start_date: Optional[datetime] = None
+    created_at: datetime
+    author_username: str
+    author_display_name: Optional[str] = None
+    measurements: List[SharedMeasurementOut] = []
+
+    class Config:
+        from_attributes = True
+
+
 class FriendshipOut(BaseModel):
     id: int
     requester_id: int

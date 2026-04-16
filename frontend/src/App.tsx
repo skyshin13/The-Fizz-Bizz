@@ -11,6 +11,7 @@ import RecipesPage from './pages/RecipesPage'
 import CalculatorsPage from './pages/CalculatorsPage'
 import ExplorePage from './pages/ExplorePage'
 import ProfilePage from './pages/ProfilePage'
+import ShareProjectPage from './pages/ShareProjectPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/share/:id" element={<ShareProjectPage />} />
       <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<DashboardPage />} />
         <Route path="projects" element={<ProjectsPage />} />

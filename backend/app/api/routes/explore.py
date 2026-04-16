@@ -1,12 +1,47 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.db.database import get_db
-from app.models.models import FermentationProject, User
-from app.schemas.schemas import PublicProjectOut, PublicUserOut
+from app.models.models import FermentationProject, MeasurementLog, User
+from app.schemas.schemas import PublicProjectOut, PublicUserOut, SharedProjectOut, SharedMeasurementOut
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/explore", tags=["Explore"])
+
+
+@router.get("/share/{project_id}", response_model=SharedProjectOut)
+def get_shared_project(project_id: int, db: Session = Depends(get_db)):
+    """Public endpoint — no auth required. Returns project only if is_public=True."""
+    project = (
+        db.query(FermentationProject)
+        .options(joinedload(FermentationProject.owner))
+        .filter(
+            FermentationProject.id == project_id,
+            FermentationProject.is_public == True,
+        )
+        .first()
+    )
+    if not project:
+        raise HTTPException(404, "Project not found or is not public")
+    measurements = (
+        db.query(MeasurementLog)
+        .filter(MeasurementLog.project_id == project_id)
+        .order_by(MeasurementLog.logged_at)
+        .all()
+    )
+    return SharedProjectOut(
+        id=project.id,
+        name=project.name,
+        fermentation_type=project.fermentation_type,
+        status=project.status,
+        description=project.description,
+        cover_photo_url=project.cover_photo_url,
+        start_date=project.start_date,
+        created_at=project.created_at,
+        author_username=project.owner.username,
+        author_display_name=project.owner.display_name,
+        measurements=[SharedMeasurementOut.model_validate(m) for m in measurements],
+    )
 
 
 @router.get("/projects", response_model=List[PublicProjectOut])

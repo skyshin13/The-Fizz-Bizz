@@ -6,7 +6,7 @@ import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2 } from 'lucide-react'
 import styles from './ProjectDetailPage.module.css'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -163,6 +163,20 @@ export default function ProjectDetailPage() {
                 <Bell size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Set Reminder
               </button>
             </div>
+            {/* Row 3: Share link (only if public) */}
+            {project.is_public && (
+              <div style={{ display: 'flex', gap: '0.625rem' }}>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/share/${project.id}`
+                    navigator.clipboard.writeText(url).then(() => toast.success('Share link copied!'))
+                  }}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Share2 size={14} /> Copy Share Link
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
