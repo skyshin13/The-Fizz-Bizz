@@ -25,6 +25,8 @@ export default function ProjectDetailPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descInput, setDescInput] = useState('')
   const { getEmoji } = useFermentationTypes()
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
@@ -166,25 +168,67 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* About this batch */}
-      {project.description && (
-        <div className="fade-in-delay-1" style={{ marginBottom: '1.5rem', background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)' }}>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{project.description}</p>
-          {(project.batch_size_liters || project.vessel_type || project.fermentation_temp_celsius || project.yeast_strain) && (
-            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
-              {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
-              {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
-              {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
-              {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
-              {project.yeast_strain && (
-                <Detail
-                  label="Yeast Strain"
-                  value={`${project.yeast_strain.name}${project.yeast_strain.strain_code ? ` (${project.yeast_strain.strain_code})` : ''}${project.yeast_strain.brand ? ` · ${project.yeast_strain.brand}` : ''}`}
-                />
-              )}
+      <div className="fade-in-delay-1" style={{ marginBottom: '1.5rem', background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)' }}>
+        {editingDesc ? (
+          <form
+            onSubmit={async e => {
+              e.preventDefault()
+              const trimmed = descInput.trim()
+              try {
+                await api.patch(`/projects/${project.id}`, { description: trimmed || null })
+                await load()
+                toast.success('Description updated')
+              } catch {
+                toast.error('Failed to update description')
+              } finally {
+                setEditingDesc(false)
+              }
+            }}
+          >
+            <textarea
+              autoFocus
+              value={descInput}
+              onChange={e => setDescInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false) }}
+              rows={3}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.625rem', border: '1px solid var(--amber)', borderRadius: '8px', background: 'var(--card-bg)', color: 'var(--text-primary)', fontSize: '0.875rem', lineHeight: 1.7, resize: 'vertical', outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button type="submit" style={{ padding: '0.35rem 0.875rem', background: 'var(--amber)', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--brown-dark)', fontWeight: 600, fontSize: '0.8rem' }}>Save</button>
+              <button type="button" onClick={() => setEditingDesc(false)} style={{ padding: '0.35rem 0.875rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Cancel</button>
             </div>
-          )}
-        </div>
-      )}
+          </form>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+            {project.description ? (
+              <p style={{ flex: 1, fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{project.description}</p>
+            ) : (
+              <p style={{ flex: 1, fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontStyle: 'italic' }}>No description yet.</p>
+            )}
+            <button
+              onClick={() => { setDescInput(project.description || ''); setEditingDesc(true) }}
+              title="Edit description"
+              style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', borderRadius: '6px', flexShrink: 0 }}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
+        )}
+        {(project.batch_size_liters || project.vessel_type || project.fermentation_temp_celsius || project.yeast_strain) && (
+          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
+            {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
+            {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
+            {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
+            {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
+            {project.yeast_strain && (
+              <Detail
+                label="Yeast Strain"
+                value={`${project.yeast_strain.name}${project.yeast_strain.strain_code ? ` (${project.yeast_strain.strain_code})` : ''}${project.yeast_strain.brand ? ` · ${project.yeast_strain.brand}` : ''}`}
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Stats row */}
       {(() => {
