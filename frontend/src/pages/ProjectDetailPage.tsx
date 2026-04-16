@@ -27,6 +27,11 @@ export default function ProjectDetailPage() {
   const [nameInput, setNameInput] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
   const [descInput, setDescInput] = useState('')
+  const [editingYeast, setEditingYeast] = useState(false)
+  const [yeastSearch, setYeastSearch] = useState('')
+  const [yeastOptions, setYeastOptions] = useState<{ id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string }[]>([])
+  const [yeastDropdown, setYeastDropdown] = useState(false)
+  const [savingYeast, setSavingYeast] = useState(false)
   const { getEmoji } = useFermentationTypes()
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
@@ -130,14 +135,91 @@ export default function ProjectDetailPage() {
                 <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.625rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px' }}>{project.status}</span>
                 {daysSince != null && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Day {daysSince}</span>}
               </div>
-              {project.yeast_strain && (
+              {/* Yeast strain — view or edit */}
+              {editingYeast ? (
+                <div style={{ marginTop: '0.375rem', position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                      <input
+                        autoFocus
+                        value={yeastSearch}
+                        onChange={e => { setYeastSearch(e.target.value); setYeastDropdown(true) }}
+                        onFocus={() => setYeastDropdown(true)}
+                        onBlur={() => setTimeout(() => setYeastDropdown(false), 150)}
+                        placeholder="Search yeast strains…"
+                        style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '1.75rem', paddingRight: '0.75rem', paddingTop: '0.4rem', paddingBottom: '0.4rem', border: '1px solid var(--amber)', borderRadius: '6px', background: 'var(--card-bg)', fontSize: '0.78rem', outline: 'none' }}
+                      />
+                    </div>
+                    {project.yeast_strain && (
+                      <button
+                        onClick={async () => {
+                          setSavingYeast(true)
+                          try {
+                            await api.put(`/projects/${project.id}/yeast`, { yeast_id: null })
+                            await load()
+                            toast.success('Yeast strain removed')
+                          } catch { toast.error('Failed to update yeast strain') }
+                          finally { setSavingYeast(false); setEditingYeast(false); setYeastSearch('') }
+                        }}
+                        title="Remove yeast strain"
+                        style={{ padding: '0.3rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                    <button onClick={() => { setEditingYeast(false); setYeastSearch('') }} style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {yeastDropdown && yeastOptions.filter(y => !yeastSearch || y.name.toLowerCase().includes(yeastSearch.toLowerCase()) || (y.brand?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false) || (y.strain_code?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false)).slice(0, 8).length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-md)', marginTop: 2, maxHeight: '200px', overflowY: 'auto' }}>
+                      {yeastOptions.filter(y => !yeastSearch || y.name.toLowerCase().includes(yeastSearch.toLowerCase()) || (y.brand?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false) || (y.strain_code?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false)).slice(0, 8).map(y => (
+                        <button
+                          key={y.id}
+                          onMouseDown={async () => {
+                            setSavingYeast(true)
+                            try {
+                              await api.put(`/projects/${project.id}/yeast`, { yeast_id: y.id })
+                              await load()
+                              toast.success(`Yeast set to ${y.name}`)
+                            } catch { toast.error('Failed to update yeast strain') }
+                            finally { setSavingYeast(false); setEditingYeast(false); setYeastSearch('') }
+                          }}
+                          style={{ width: '100%', textAlign: 'left', padding: '0.5rem 0.875rem', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {y.name}{y.strain_code && <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '0.3rem' }}>({y.strain_code})</span>}
+                          </div>
+                          {y.brand && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{y.brand}{y.yeast_type ? ` · ${y.yeast_type}` : ''}</div>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {savingYeast && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>Saving…</p>}
+                </div>
+              ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.375rem' }}>
                   <FlaskConical size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    {project.yeast_strain.name}
-                    {project.yeast_strain.strain_code && <span style={{ fontFamily: 'monospace', marginLeft: '0.3rem', opacity: 0.75 }}>({project.yeast_strain.strain_code})</span>}
-                    {project.yeast_strain.brand && <span style={{ marginLeft: '0.3rem', opacity: 0.75 }}>· {project.yeast_strain.brand}</span>}
-                  </span>
+                  {project.yeast_strain ? (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {project.yeast_strain.name}
+                      {project.yeast_strain.strain_code && <span style={{ fontFamily: 'monospace', marginLeft: '0.3rem', opacity: 0.75 }}>({project.yeast_strain.strain_code})</span>}
+                      {project.yeast_strain.brand && <span style={{ marginLeft: '0.3rem', opacity: 0.75 }}>· {project.yeast_strain.brand}</span>}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No yeast strain set</span>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (yeastOptions.length === 0) api.get('/yeasts/').then(r => setYeastOptions(r.data)).catch(() => {})
+                      setEditingYeast(true)
+                    }}
+                    title="Edit yeast strain"
+                    style={{ padding: '0.2rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
+                  >
+                    <Pencil size={11} />
+                  </button>
                 </div>
               )}
             </div>

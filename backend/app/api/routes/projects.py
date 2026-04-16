@@ -137,6 +137,36 @@ def update_project(
     return project
 
 
+@router.put("/{project_id}/yeast", response_model=ProjectOut)
+def set_project_yeast(
+    project_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set or clear the yeast strain for a project. Pass {"yeast_id": 123} to set, {"yeast_id": null} to clear."""
+    project = db.query(FermentationProject).options(
+        joinedload(FermentationProject.measurements),
+        joinedload(FermentationProject.observations),
+    ).filter(
+        FermentationProject.id == project_id,
+        FermentationProject.user_id == current_user.id,
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+    # Delete existing connection
+    db.query(ProjectYeastConnection).filter_by(project_id=project_id).delete(synchronize_session=False)
+    yeast_id = body.get("yeast_id")
+    if yeast_id:
+        yeast = db.query(YeastProfile).filter_by(id=yeast_id).first()
+        if not yeast:
+            raise HTTPException(404, "Yeast strain not found")
+        db.add(ProjectYeastConnection(project_id=project_id, yeast_id=yeast_id))
+    db.commit()
+    _attach_yeast_strain(project, db)
+    return project
+
+
 @router.delete("/{project_id}", status_code=204)
 def delete_project(
     project_id: int,
