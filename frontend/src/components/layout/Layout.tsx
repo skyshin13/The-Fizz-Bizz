@@ -86,6 +86,23 @@ export default function Layout() {
       <main className={styles.main}>
         <Outlet />
       </main>
+
+      {/* Bottom nav — mobile only */}
+      <nav className={styles.bottomNav}>
+        {navItems.map(({ to, icon: Icon, label, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) =>
+              `${styles.bottomNavItem} ${isActive ? styles.bottomNavItemActive : ''}`
+            }
+          >
+            <Icon size={20} />
+            <span>{label.split(' ')[0]}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }
