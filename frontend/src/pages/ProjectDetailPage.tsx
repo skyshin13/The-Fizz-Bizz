@@ -77,7 +77,7 @@ export default function ProjectDetailPage() {
         <Link to="/projects" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
           <ArrowLeft size={14} /> Back to Projects
         </Link>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className={styles.headerRow}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <span style={{ fontSize: '3rem' }}>{getEmoji(project.fermentation_type)}</span>
             <div>
@@ -142,7 +142,7 @@ export default function ProjectDetailPage() {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+          <div className={styles.actionButtons}>
             {/* Row 1: Complete Project + Add Note */}
             <div style={{ display: 'flex', gap: '0.625rem' }}>
               {project.status === 'active' && (

@@ -25,6 +25,21 @@
   padding: 1.5rem;
 }
 
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.actionButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
 @media (max-width: 768px) {
   .page {
     padding: 1.25rem 1rem;
@@ -47,5 +62,14 @@
 
   .logRight {
     padding: 1.25rem 1rem;
+  }
+
+  .headerRow {
+    flex-direction: column;
+  }
+
+  .actionButtons {
+    align-items: flex-start;
+    width: 100%;
   }
 }
