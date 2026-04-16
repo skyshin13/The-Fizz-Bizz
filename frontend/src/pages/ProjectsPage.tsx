@@ -57,16 +57,18 @@ export default function ProjectsPage() {
       </div>
 
       {/* Filters */}
-      <div className="fade-in-delay-1" style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div className={`fade-in-delay-1 ${styles.filters}`}>
         <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
           <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ width: '100%', paddingLeft: '2rem', padding: '0.6rem 0.875rem 0.6rem 2.25rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--card-bg)', fontSize: '0.875rem' }} />
         </div>
-        {['all', 'active', 'completed'].map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, background: filterStatus === s ? 'var(--amber)' : 'var(--card-bg)', color: filterStatus === s ? 'var(--brown-dark)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+        <div className={styles.filterButtons}>
+          {['all', 'active', 'completed'].map(s => (
+            <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, background: filterStatus === s ? 'var(--amber)' : 'var(--card-bg)', color: filterStatus === s ? 'var(--brown-dark)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid */}
