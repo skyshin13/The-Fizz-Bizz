@@ -6,7 +6,7 @@ import { Project, FermentationType } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Dna } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Dna, AlertTriangle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function ProjectsPage() {
@@ -15,6 +15,8 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showCreate, setShowCreate] = useState(false)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const { types, getEmoji } = useFermentationTypes()
 
   const load = () => api.get('/projects/').then(r => setProjects(r.data)).finally(() => setLoading(false))
@@ -26,11 +28,19 @@ export default function ProjectsPage() {
     return true
   })
 
-  const deleteProject = async (id: number) => {
-    if (!confirm('Delete this project?')) return
-    await api.delete(`/projects/${id}`)
-    toast.success('Project deleted')
-    load()
+  const confirmDelete = async () => {
+    if (deleteId === null) return
+    setDeleting(true)
+    try {
+      await api.delete(`/projects/${deleteId}`)
+      toast.success('Project deleted')
+      setDeleteId(null)
+      load()
+    } catch {
+      toast.error('Failed to delete project')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -69,12 +79,36 @@ export default function ProjectsPage() {
       ) : (
         <div className="fade-in-delay-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
           {filtered.map(project => (
-            <ProjectRow key={project.id} project={project} onDelete={() => deleteProject(project.id)} getEmoji={getEmoji} />
+            <ProjectRow key={project.id} project={project} onDelete={() => setDeleteId(project.id)} getEmoji={getEmoji} />
           ))}
         </div>
       )}
 
       {showCreate && <CreateProjectModal types={types} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
+
+      {deleteId !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem' }} onClick={() => setDeleteId(null)}>
+          <div style={{ background: 'var(--card-bg)', borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '10px', background: '#b54a2c18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={20} color="var(--rust)" />
+              </div>
+              <h2 style={{ fontSize: '1.1rem' }}>Delete Project?</h2>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+              This will permanently delete the project and all its measurements, notes, and photos. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setDeleteId(null)} style={{ flex: 1, padding: '0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={confirmDelete} disabled={deleting} style={{ flex: 1, padding: '0.7rem', background: 'var(--rust)', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
