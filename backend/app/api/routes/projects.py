@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.database import get_db
-from app.models.models import FermentationProject, MeasurementLog, ObservationNote, User, ProjectYeastConnection, YeastProfile, ProjectCERState
+from app.models.models import FermentationProject, MeasurementLog, ObservationNote, ProjectPhoto, Reminder, User, ProjectYeastConnection, YeastProfile, ProjectCERState
 from app.schemas.schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
     MeasurementCreate, MeasurementOut,
@@ -123,7 +123,12 @@ def delete_project(
     ).first()
     if not project:
         raise HTTPException(404, "Project not found")
-    db.query(ProjectCERState).filter(ProjectCERState.project_id == project_id).delete()
+    db.query(ProjectCERState).filter(ProjectCERState.project_id == project_id).delete(synchronize_session=False)
+    db.query(MeasurementLog).filter(MeasurementLog.project_id == project_id).delete(synchronize_session=False)
+    db.query(ObservationNote).filter(ObservationNote.project_id == project_id).delete(synchronize_session=False)
+    db.query(ProjectPhoto).filter(ProjectPhoto.project_id == project_id).delete(synchronize_session=False)
+    db.query(Reminder).filter(Reminder.project_id == project_id).delete(synchronize_session=False)
+    db.query(ProjectYeastConnection).filter(ProjectYeastConnection.project_id == project_id).delete(synchronize_session=False)
     db.delete(project)
     db.commit()
 
