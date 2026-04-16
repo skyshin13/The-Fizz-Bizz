@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Dna, AlertTriangle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import styles from './ProjectsPage.module.css'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -44,8 +45,8 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1100px', margin: '0 auto' }}>
-      <div className="fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+    <div className={styles.page}>
+      <div className={`fade-in ${styles.header}`}>
         <div>
           <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Fermentation Projects</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{projects.length} total projects</p>
@@ -77,7 +78,7 @@ export default function ProjectsPage() {
           <p style={{ color: 'var(--text-muted)' }}>No projects found. Start a new fermentation!</p>
         </div>
       ) : (
-        <div className="fade-in-delay-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+        <div className={`fade-in-delay-2 ${styles.grid}`}>
           {filtered.map(project => (
             <ProjectRow key={project.id} project={project} onDelete={() => setDeleteId(project.id)} getEmoji={getEmoji} />
           ))}

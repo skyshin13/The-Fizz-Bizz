@@ -3,6 +3,7 @@ import api from '../lib/api'
 import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
 import { Calculator, FlaskConical, Zap, Wind, AlertTriangle, Search, Info } from 'lucide-react'
+import styles from './CalculatorsPage.module.css'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend,
 } from 'recharts'
@@ -13,13 +14,13 @@ export default function CalculatorsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('abv')
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '900px', margin: '0 auto' }}>
+    <div className={styles.page}>
       <div className="fade-in" style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Fermentation Calculators</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Mathematical tools for precise fermentation management.</p>
       </div>
 
-      <div className="fade-in-delay-1" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className={`fade-in-delay-1 ${styles.tabs}`}>
         {[
           { id: 'abv' as const,    label: 'ABV Calculator',    icon: FlaskConical },
           { id: 'priming' as const, label: 'Priming Sugar',    icon: Calculator },

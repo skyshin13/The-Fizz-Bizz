@@ -1,0 +1,30 @@
+.page {
+  padding: 2.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.profileHeader {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--border-light);
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 1.25rem 1rem;
+  }
+
+  .profileHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+}

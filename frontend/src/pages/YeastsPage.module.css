@@ -1,0 +1,22 @@
+.page {
+  padding: 2.5rem;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 1.25rem 1rem;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

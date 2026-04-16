@@ -6,6 +6,7 @@ import { PublicUserProfile, FriendRequest, PublicProject } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
 import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell } from 'lucide-react'
+import styles from './ProfilePage.module.css'
 import { formatDistanceToNow, format } from 'date-fns'
 
 export default function ProfilePage() {
@@ -55,9 +56,9 @@ function OwnProfile() {
   }
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto' }}>
+    <div className={styles.page}>
       {/* Header */}
-      <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2.5rem', padding: '2rem', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+      <div className={`fade-in ${styles.profileHeader}`}>
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '1.75rem', color: 'var(--brown-dark)', flexShrink: 0 }}>
           {me?.display_name?.[0]?.toUpperCase() || me?.username?.[0]?.toUpperCase() || '?'}
         </div>
@@ -228,9 +229,9 @@ function OtherProfile({ username }: { username: string }) {
   }
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '900px', margin: '0 auto' }}>
+    <div className={styles.page}>
       {/* Profile header */}
-      <div className="fade-in" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2.5rem', padding: '2rem', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+      <div className={`fade-in ${styles.profileHeader}`}>
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '1.75rem', color: 'var(--brown-dark)', flexShrink: 0 }}>
           {profile.display_name?.[0]?.toUpperCase() || profile.username[0].toUpperCase()}
         </div>

@@ -1,0 +1,51 @@
+.page {
+  padding: 2.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.statsGrid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.logGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.logLeft {
+  padding: 1.5rem;
+  border-right: 1px solid var(--border-light);
+}
+
+.logRight {
+  padding: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 1.25rem 1rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+
+  .logGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .logLeft {
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+    padding: 1.25rem 1rem;
+  }
+
+  .logRight {
+    padding: 1.25rem 1rem;
+  }
+}

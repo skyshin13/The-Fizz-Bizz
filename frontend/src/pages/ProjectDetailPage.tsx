@@ -7,6 +7,7 @@ import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info } from 'lucide-react'
+import styles from './ProjectDetailPage.module.css'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
@@ -68,7 +69,7 @@ export default function ProjectDetailPage() {
     : null
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1100px', margin: '0 auto' }}>
+    <div className={styles.page}>
       {/* Header */}
       <div className="fade-in" style={{ marginBottom: '2rem' }}>
         <Link to="/projects" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
@@ -203,7 +204,7 @@ export default function ProjectDetailPage() {
           { label: 'Temp (°C)', value: latestM?.temperature_celsius?.toFixed(1), icon: Thermometer, color: 'var(--slate)' },
         ]
         return (
-      <div className="fade-in-delay-1" style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length}, 1fr)`, gap: '1rem', marginBottom: '2rem' }}>
+      <div className={`fade-in-delay-1 ${styles.statsGrid}`} style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
         {stats.map(({ label, value, icon: Icon, color }) => (
           <div key={label} style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border-light)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -325,9 +326,9 @@ export default function ProjectDetailPage() {
         </div>
 
         {activeTab === 'log' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+          <div className={styles.logGrid}>
             {/* Observations */}
-            <div style={{ padding: '1.5rem', borderRight: '1px solid var(--border-light)' }}>
+            <div className={styles.logLeft}>
               <h2 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--text-secondary)' }}>Observation Notes</h2>
               {project.observations.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No notes yet.</p>
@@ -354,7 +355,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Measurements log */}
-            <div style={{ padding: '1.5rem' }}>
+            <div className={styles.logRight}>
               <h2 style={{ fontSize: '1rem', marginBottom: '1.25rem', color: 'var(--text-secondary)' }}>Measurement Log</h2>
               {project.measurements.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No measurements yet.</p>

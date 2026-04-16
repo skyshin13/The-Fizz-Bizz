@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
 import { YeastProfile } from '../types'
 import { Dna, Thermometer, FlaskConical, Search, AlertCircle, X, ChevronDown, ChevronUp } from 'lucide-react'
+import styles from './YeastsPage.module.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export default function YeastsPage() {
   const clearAll = () => { setSearch(''); setTypeFilter('All'); setBrewCategory(null) }
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1280px', margin: '0 auto' }}>
+    <div className={styles.page}>
 
       {/* Page header */}
       <div className="fade-in" style={{ marginBottom: '2rem' }}>
@@ -233,7 +234,7 @@ export default function YeastsPage() {
           <p style={{ fontSize: '0.875rem' }}>Loading strains…</p>
         </div>
       ) : (
-        <div className="fade-in-delay-1" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.5rem', alignItems: 'start' }}>
+        <div className={`fade-in-delay-1 ${styles.layout}`}>
 
           {/* Left: strain list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>

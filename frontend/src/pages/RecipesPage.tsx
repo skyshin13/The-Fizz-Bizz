@@ -4,6 +4,7 @@ import api from '../lib/api'
 import { Recipe } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { Clock, ChefHat, Users, BookOpen, Search, AlertCircle } from 'lucide-react'
+import styles from './RecipesPage.module.css'
 
 const DIFF_COLOR: Record<string, string> = {
   beginner: 'var(--moss)', intermediate: 'var(--amber)', advanced: 'var(--rust)',
@@ -45,7 +46,7 @@ export default function RecipesPage() {
   })
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className={styles.page}>
 
       {/* Page header */}
       <div className="fade-in" style={{ marginBottom: '1.75rem' }}>
@@ -113,7 +114,7 @@ export default function RecipesPage() {
         </div>
       ) : selected ? (
         /* Split view: list + detail panel */
-        <div className="fade-in-delay-1" style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '1.5rem', alignItems: 'start' }}>
+        <div className={`fade-in-delay-1 ${styles.layout}`}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {filtered.map(recipe => (
               <RecipeCard

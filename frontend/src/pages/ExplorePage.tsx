@@ -5,6 +5,7 @@ import { PublicProject, PublicUser } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
 import { Search, Users, FlaskConical, UserPlus, Check } from 'lucide-react'
+import styles from './ExplorePage.module.css'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function ExplorePage() {
@@ -62,7 +63,7 @@ export default function ExplorePage() {
   )
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1100px', margin: '0 auto' }}>
+    <div className={styles.page}>
       <div className="fade-in" style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Explore</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
@@ -119,7 +120,7 @@ export default function ExplorePage() {
               <p style={{ color: 'var(--text-muted)' }}>No public projects found yet. Be the first to share!</p>
             </div>
           ) : (
-            <div className="fade-in-delay-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div className={`fade-in-delay-2 ${styles.grid}`}>
               {filteredProjects.map(p => (
                 <PublicProjectCard key={p.id} project={p} getEmoji={getEmoji} />
               ))}
