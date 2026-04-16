@@ -6,6 +6,7 @@ import { Project } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { FlaskConical, TrendingUp, CheckCircle, Clock, Plus, Activity } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import styles from './DashboardPage.module.css'
 
 const STATUS_COLOR: Record<string, string> = {
   active: '#4a6741', completed: '#3d4e5c', failed: '#b54a2c', paused: '#c8832a'
@@ -25,20 +26,20 @@ export default function DashboardPage() {
   const completed = projects.filter(p => p.status === 'completed')
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1100px', margin: '0 auto' }}>
+    <div className={styles.page}>
       {/* Header */}
       <div className="fade-in" style={{ marginBottom: '2.5rem' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>
+        <h1 className={styles.heading}>
           Good {getTimeOfDay()}, {user?.display_name || user?.username} 👋
         </h1>
         <p style={{ color: 'var(--text-secondary)' }}>Here's what's bubbling in your fermentation studio.</p>
       </div>
 
       {/* Stats row */}
-      <div className="fade-in-delay-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2.5rem' }}>
+      <div className={`fade-in-delay-1 ${styles.statsGrid}`}>
         {[
           { icon: FlaskConical, label: 'Active Batches', value: active.length, color: 'var(--moss)' },
           { icon: CheckCircle, label: 'Completed', value: completed.length, color: 'var(--slate)' },
