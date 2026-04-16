@@ -160,33 +160,7 @@
   background: var(--warm-white);
 }
 
-/* ── Mobile (≤ 768px) ─────────────────────────────────── */
-@media (max-width: 768px) {
-  .root {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    display: none;
-  }
-
-  .main {
-    padding-bottom: 64px;
-    /* hide scrollbar on mobile */
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .main::-webkit-scrollbar {
-    display: none;
-  }
-
-  .bottomNav {
-    display: flex;
-  }
-}
-
-/* ── Bottom nav (mobile only) ─────────────────────────── */
+/* ── Bottom nav (base — hidden on desktop) ────────────── */
 .bottomNav {
   display: none;
   position: fixed;
@@ -230,4 +204,29 @@
 
 .bottomNavItemActive svg {
   filter: drop-shadow(0 0 4px rgba(245, 199, 110, 0.5));
+}
+
+/* ── Mobile (≤ 768px) ─────────────────────────────────── */
+@media (max-width: 768px) {
+  .root {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .main {
+    padding-bottom: 64px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .main::-webkit-scrollbar {
+    display: none;
+  }
+
+  .bottomNav {
+    display: flex;
+  }
 }
