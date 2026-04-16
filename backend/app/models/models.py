@@ -91,6 +91,7 @@ class FermentationProject(Base):
     photos = relationship("ProjectPhoto", back_populates="project", cascade="all, delete-orphan")
     reminders = relationship("Reminder", back_populates="project", cascade="all, delete-orphan")
     yeast_connections = relationship("ProjectYeastConnection", back_populates="project", cascade="all, delete-orphan")
+    cer_state = relationship("ProjectCERState", back_populates="project", cascade="all, delete-orphan", uselist=False)
 
 
 class MeasurementLog(Base):
@@ -304,4 +305,4 @@ class ProjectCERState(Base):
     psi_cumulative = Column(Float, default=0.0)   # total PSI ever produced
     psi_released   = Column(Float, default=0.0)   # total PSI removed by CO₂ release events
 
-    project = relationship("FermentationProject", uselist=False)
+    project = relationship("FermentationProject", back_populates="cer_state")
