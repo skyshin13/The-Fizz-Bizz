@@ -78,7 +78,7 @@ export default function ProjectDetailPage() {
   return (
     <div className={styles.page}>
       {/* Header */}
-      <div className="fade-in" style={{ marginBottom: '2rem' }}>
+      <div className="fade-in" style={{ marginBottom: '2rem', position: 'relative', zIndex: 2 }}>
         <Link to="/projects" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
           <ArrowLeft size={14} /> Back to Projects
         </Link>
