@@ -2,7 +2,7 @@ import { useState } from 'react'
 import api from '../lib/api'
 import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { Calculator, FlaskConical } from 'lucide-react'
+import { Calculator, FlaskConical, Zap } from 'lucide-react'
 import styles from './CalculatorsPage.module.css'
 
 type Tab = 'abv' | 'priming'
