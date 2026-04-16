@@ -172,22 +172,14 @@
   border-top: 1px solid rgba(255,255,255,0.08);
   z-index: 100;
   align-items: center;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.bottomNav::-webkit-scrollbar {
-  display: none;
+  justify-content: space-around;
 }
 
 .bottomNavItem {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  width: 56px;
+  flex: 1;
   height: 56px;
   color: rgba(245, 240, 232, 0.6);
   transition: color 0.2s;
