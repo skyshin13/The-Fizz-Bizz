@@ -149,6 +149,7 @@ def get_live_cer(
             temperature_c=state_row.temperature_c,
             X=round(state_row.X, 4),
             S=round(state_row.S, 4),
+            interval_seconds=getattr(state_row, 'interval_seconds', 30) or 30,
         )
 
     return LiveCERResponse(
@@ -225,6 +226,8 @@ def update_cer_params(
         state_row.volume_ml = body.volume_ml
     if body.temperature_c is not None:
         state_row.temperature_c = body.temperature_c
+    if body.interval_seconds is not None:
+        state_row.interval_seconds = max(5, body.interval_seconds)
 
     db.commit()
     return {"status": "ok"}

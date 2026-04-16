@@ -731,7 +731,7 @@ function friendlyInterval(hours: number): string {
 
 interface CERStrain    { id: string; name: string; strain_type: string; brand: string; opt_temp_c: number; temp_min_c: number; temp_max_c: number; ethanol_tol: number; description: string }
 interface LiveCERPoint { hours_elapsed: number; co2_psi: number; timestamp: string }
-interface LiveCERState { current_psi: number; current_phase: string; current_cer_estimate: number; elapsed_hours: number; strain_id: string; strain_name: string; sugar_g: number; volume_ml: number; temperature_c: number; X: number; S: number }
+interface LiveCERState { current_psi: number; current_phase: string; current_cer_estimate: number; elapsed_hours: number; strain_id: string; strain_name: string; sugar_g: number; volume_ml: number; temperature_c: number; X: number; S: number; interval_seconds: number }
 
 const TYPE_LABELS: Record<string, string> = { ale: 'Ale', lager: 'Lager', wheat: 'Wheat', wine: 'Wine', champagne: 'Champagne', saison: 'Saison', wild: 'Wild / Belgian' }
 const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59e0b', stationary: '#10b981', decline: '#ef4444' }
@@ -750,6 +750,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   const [volume, setVolume]       = useState('5000')
   const [temp, setTemp]           = useState('20')
   const [threshold, setThreshold] = useState('150')  // CER alert in mg/L/h (frontend-only)
+  const [interval, setInterval]   = useState('30')   // tick interval in seconds
 
   // Live data from the database
   const [points, setPoints]       = useState<LiveCERPoint[]>([])
@@ -778,6 +779,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
         setSugar(String(Math.round(s.sugar_g)))
         setVolume(String(Math.round(s.volume_ml)))
         setTemp(String(s.temperature_c))
+        setInterval(String(s.interval_seconds ?? 30))
         initialised.current = true
       }
     } catch { /* silent — offline */ }
@@ -805,14 +807,15 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   }, [projectId])
 
   // ── Send updated params to backend ─────────────────────────────────────────
-  const patchParams = async (overrides?: { strain_id?: string }) => {
+  const patchParams = async (overrides?: { strain_id?: string; interval_seconds?: number }) => {
     setPatching(true)
     try {
       await api.patch(`/calculations/cer-params/${projectId}`, {
-        strain_id:    overrides?.strain_id ?? selectedStrain?.id,
-        sugar_g:      parseFloat(sugar)  || undefined,
-        volume_ml:    parseFloat(volume) || undefined,
-        temperature_c: parseFloat(temp)  || undefined,
+        strain_id:        overrides?.strain_id ?? selectedStrain?.id,
+        sugar_g:          parseFloat(sugar)    || undefined,
+        volume_ml:        parseFloat(volume)   || undefined,
+        temperature_c:    parseFloat(temp)     || undefined,
+        interval_seconds: overrides?.interval_seconds ?? (parseInt(interval) || undefined),
       })
       await fetchData()
     } catch { toast.error('Could not update simulation params') }
@@ -858,10 +861,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
 
       {/* ── Controls ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Persistent CO₂ simulation — continues across restarts. Backfills any offline gap automatically.
-        </p>
-
+        
         {/* Strain picker */}
         <div style={{ position: 'relative' }}>
           <label style={cerLabel}>Yeast Strain</label>
@@ -915,6 +915,26 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
         <div>
           <label style={cerLabel}>CER Alert (mg/L/h)</label>
           <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} style={cerInput} />
+        </div>
+
+        <div>
+          <label style={cerLabel}>Update Interval</label>
+          <select
+            value={interval}
+            onChange={e => {
+              setInterval(e.target.value)
+              patchParams({ interval_seconds: parseInt(e.target.value) })
+            }}
+            style={{ ...cerInput, cursor: 'pointer' }}
+          >
+            <option value="5">Every 5 seconds</option>
+            <option value="15">Every 15 seconds</option>
+            <option value="30">Every 30 seconds</option>
+            <option value="60">Every 1 minute</option>
+            <option value="300">Every 5 minutes</option>
+            <option value="600">Every 10 minutes</option>
+            <option value="1800">Every 30 minutes</option>
+          </select>
         </div>
 
         <button

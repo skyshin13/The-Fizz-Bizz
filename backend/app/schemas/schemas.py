@@ -437,6 +437,7 @@ class LiveCERStateOut(BaseModel):
     temperature_c: float
     X: float                        # biomass g/L
     S: float                        # substrate g/L remaining
+    interval_seconds: int = 30
 
 
 class LiveCERResponse(BaseModel):
@@ -450,6 +451,7 @@ class CERParamsUpdate(BaseModel):
     sugar_g: Optional[float] = None
     volume_ml: Optional[float] = None
     temperature_c: Optional[float] = None
+    interval_seconds: Optional[int] = None
 
 
 # ─── Social Schemas ───────────────────────────────────────────────────────────

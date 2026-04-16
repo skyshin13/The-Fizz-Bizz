@@ -174,6 +174,10 @@ def _tick():
             if last_tick.tzinfo is None:
                 last_tick = last_tick.replace(tzinfo=timezone.utc)
 
+            interval = getattr(state_row, 'interval_seconds', 30) or 30
+            if (now - last_tick).total_seconds() < interval:
+                continue
+
             gap_hours = max(0.0, (now - last_tick).total_seconds() / 3600.0)
 
             # Reconstruct in-memory CERState from persisted values

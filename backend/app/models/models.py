@@ -299,6 +299,7 @@ class ProjectCERState(Base):
     elapsed_t    = Column(Float,  default=0.0)    # hours since project start at last tick
     phase        = Column(String, default="lag")
 
+    interval_seconds = Column(Integer, default=30, nullable=False, server_default="30")
     last_tick_at = Column(DateTime(timezone=True), nullable=True)
 
     # CO₂ pressure accounting
