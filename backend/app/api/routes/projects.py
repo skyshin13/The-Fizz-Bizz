@@ -15,12 +15,8 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
 def _attach_yeast_strain(project, db):
-    """Populate the transient yeast_strain attribute from ProjectYeastConnection."""
-    conn = (
-        db.query(ProjectYeastConnection)
-        .filter_by(project_id=project.id)
-        .first()
-    )
+    """Populate the transient yeast_strain attribute for a single project."""
+    conn = db.query(ProjectYeastConnection).filter_by(project_id=project.id).first()
     if conn:
         yeast = db.query(YeastProfile).filter_by(id=conn.yeast_id).first()
         if yeast:
@@ -31,24 +27,54 @@ def _attach_yeast_strain(project, db):
                 'brand': yeast.brand,
                 'yeast_type': yeast.yeast_type,
             })()
-        else:
-            project.yeast_strain = None
-    else:
-        project.yeast_strain = None
+            return project
+    project.yeast_strain = None
     return project
+
+
+def _attach_yeast_strains_batch(projects, db):
+    """Populate yeast_strain for a list of projects using 2 queries total (not 2×N)."""
+    if not projects:
+        return projects
+    project_ids = [p.id for p in projects]
+    connections = db.query(ProjectYeastConnection).filter(
+        ProjectYeastConnection.project_id.in_(project_ids)
+    ).all()
+    conn_by_project = {c.project_id: c for c in connections}
+    yeast_ids = list({c.yeast_id for c in connections})
+    yeasts_by_id = {}
+    if yeast_ids:
+        yeasts = db.query(YeastProfile).filter(YeastProfile.id.in_(yeast_ids)).all()
+        yeasts_by_id = {y.id: y for y in yeasts}
+    for p in projects:
+        conn = conn_by_project.get(p.id)
+        yeast = yeasts_by_id.get(conn.yeast_id) if conn else None
+        if yeast:
+            p.yeast_strain = type('ProjectYeastOut', (), {
+                'yeast_id': yeast.id,
+                'name': yeast.name,
+                'strain_code': yeast.strain_code,
+                'brand': yeast.brand,
+                'yeast_type': yeast.yeast_type,
+            })()
+        else:
+            p.yeast_strain = None
+    return projects
 
 
 @router.get("/", response_model=List[ProjectOut])
 def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     projects = (
         db.query(FermentationProject)
-        .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.observations))
+        .options(
+            joinedload(FermentationProject.measurements),
+            joinedload(FermentationProject.observations),
+        )
         .filter(FermentationProject.user_id == current_user.id)
         .order_by(FermentationProject.created_at.desc())
         .all()
     )
-    for p in projects:
-        _attach_yeast_strain(p, db)
+    _attach_yeast_strains_batch(projects, db)
     return projects
 
 
