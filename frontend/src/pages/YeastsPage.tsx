@@ -126,7 +126,7 @@ export default function YeastsPage() {
         <div style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.875rem' }}>
           What do you want to brew?
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
           {BREW_CATEGORIES.map(cat => {
             const active = brewCategory?.label === cat.label
             return (
