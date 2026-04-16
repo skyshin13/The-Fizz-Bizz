@@ -916,7 +916,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.5rem' }}>
+    <div className={styles.cerGrid}>
 
       {/* ── Controls ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
@@ -1028,8 +1028,8 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
 
         <style>{`@keyframes cer-live-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
         <div style={{ background: 'var(--warm-white)', borderRadius: '10px', padding: '1rem', border: '1px solid #ef444440', transition: 'border-color 0.3s' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.625rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CO₂ Pressure (PSI)</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.62rem', fontWeight: 700, color: '#ef4444', background: '#ef444415', border: '1px solid #ef444440', borderRadius: 20, padding: '0.1rem 0.45rem' }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'cer-live-pulse 1.4s ease-in-out infinite' }} />
@@ -1041,7 +1041,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
               {/* ── Zoom window selector ── */}
               {([['all', 'All'], [6, '6h'], [24, '24h'], [48, '48h'], [-1, 'Custom']] as [number | 'all', string][]).map(([val, label]) => {
                 const active = val === -1 ? showCustom : viewHours === val && !showCustom
