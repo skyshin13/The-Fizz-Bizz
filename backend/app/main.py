@@ -1,18 +1,34 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.core.config import settings
 from app.db.database import Base, engine
 from app.api.routes import auth, users, projects, yeasts, recipes, calculations, lookup, explore, friends, reminders
 from app.services.live_cer_task import live_cer_loop
 
-# Create all tables on startup
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
+
+
+def _run_migrations():
+    """Apply any schema changes that create_all won't handle (new columns on existing tables)."""
+    with engine.connect() as conn:
+        conn.execute(text("""
+            ALTER TABLE project_cer_states
+            ADD COLUMN IF NOT EXISTS interval_seconds INTEGER NOT NULL DEFAULT 30
+        """))
+        conn.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        Base.metadata.create_all(bind=engine)
+        _run_migrations()
+    except Exception as e:
+        logger.error(f"Startup DB error: {e}")
     task = asyncio.create_task(live_cer_loop())
     yield
     task.cancel()
