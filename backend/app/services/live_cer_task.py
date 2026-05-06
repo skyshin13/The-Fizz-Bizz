@@ -42,11 +42,31 @@ SIM_DT              = 0.5       # internal simulation step (hours)
 
 def _resolve_strain(project, db) -> str:
     conn = db.query(ProjectYeastConnection).filter_by(project_id=project.id).first()
-    if conn:
-        from app.models.models import YeastProfile
-        yeast = db.query(YeastProfile).filter_by(id=conn.yeast_id).first()
-        if yeast and yeast.strain_code and yeast.strain_code in STRAIN_MAP:
-            return yeast.strain_code
+    if not conn:
+        return DEFAULT_STRAIN
+    from app.models.models import YeastProfile
+    yeast = db.query(YeastProfile).filter_by(id=conn.yeast_id).first()
+    if not yeast:
+        return DEFAULT_STRAIN
+    # 1. Exact strain_code match
+    if yeast.strain_code and yeast.strain_code in STRAIN_MAP:
+        return yeast.strain_code
+    # 2. Name contains a known strain ID (e.g. yeast name "Safale US-05" → "US-05")
+    if yeast.name:
+        name_upper = yeast.name.upper()
+        for sid in STRAIN_MAP:
+            if sid.upper() in name_upper:
+                return sid
+    # 3. Map yeast_type to a sensible default
+    type_defaults = {
+        "lager": "W-34/70",
+        "wine":  "EC-1118",
+        "ale":   "US-05",
+        "wild":  "WY3724",
+        "champagne": "EC-1118",
+    }
+    if yeast.yeast_type and yeast.yeast_type.lower() in type_defaults:
+        return type_defaults[yeast.yeast_type.lower()]
     return DEFAULT_STRAIN
 
 

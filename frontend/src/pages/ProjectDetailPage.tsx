@@ -642,6 +642,7 @@ export default function ProjectDetailPage() {
               batchSizeLiters={project.batch_size_liters}
               fermentationTempCelsius={project.fermentation_temp_celsius}
               sugarAmountGrams={project.sugar_amount_grams}
+              yeastStrain={project.yeast_strain}
             />
           </div>
         )}
@@ -976,13 +977,14 @@ const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59
 const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
 const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
 
-function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams }: {
+function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams, yeastStrain }: {
   projectId: number
   startDate?: string
   initialGravity?: number
   batchSizeLiters?: number
   fermentationTempCelsius?: number
   sugarAmountGrams?: number
+  yeastStrain?: { name?: string; strain_code?: string; yeast_type?: string } | null
 }) {
   const [strains, setStrains]           = useState<CERStrain[]>([])
   const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
@@ -995,6 +997,23 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const _og    = initialGravity  ?? 1.050
   const _sugar = sugarAmountGrams ?? Math.max(50, (_og - 1.0) * 2500 * _vol)
   const _tempF = toF(fermentationTempCelsius ?? 20.0)
+
+  // Mirror the backend _resolve_strain logic: find best CER strain for the project yeast
+  const _resolveYeastStrain = (cerStrains: CERStrain[]): string => {
+    if (!yeastStrain) return 'US-05'
+    const sc = yeastStrain.strain_code?.toUpperCase() ?? ''
+    const nm = yeastStrain.name?.toUpperCase() ?? ''
+    // 1. Exact strain_code match
+    const exact = cerStrains.find(s => s.id.toUpperCase() === sc)
+    if (exact) return exact.id
+    // 2. CER strain id appears in yeast name
+    const byName = cerStrains.find(s => nm.includes(s.id.toUpperCase()))
+    if (byName) return byName.id
+    // 3. Yeast type default
+    const typeMap: Record<string, string> = { lager: 'W-34/70', wine: 'EC-1118', champagne: 'EC-1118', wild: 'WY3724' }
+    const typeDefault = yeastStrain.yeast_type ? typeMap[yeastStrain.yeast_type.toLowerCase()] : undefined
+    return typeDefault ?? 'US-05'
+  }
 
   // Editable params (initialised from project data; overridden by backend state on first load)
   const [sugar, setSugar]         = useState(String(Math.round(_sugar)))
@@ -1036,7 +1055,8 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
           initialised.current = true
           runSim({ strain_id: freshState.strain_id, sugar_g: freshState.sugar_g, volume_ml: freshState.volume_ml, temperature_c: freshState.temperature_c }, freshState)
         } else {
-          runSim({ strain_id: 'US-05', sugar_g: _sugar, volume_ml: _vol * 1000, temperature_c: fermentationTempCelsius ?? 20.0 }, null)
+          const resolvedId = _resolveYeastStrain(strains)
+          runSim({ strain_id: resolvedId, sugar_g: _sugar, volume_ml: _vol * 1000, temperature_c: fermentationTempCelsius ?? 20.0 }, null)
         }
       }
       return freshState
@@ -1093,8 +1113,14 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
 
   // Sync selectedStrain display whenever liveState or strains list changes
   useEffect(() => {
-    if (liveState && strains.length > 0) {
+    if (strains.length === 0) return
+    if (liveState) {
       const match = strains.find(s => s.id === liveState.strain_id)
+      if (match) setSelectedStrain(match)
+    } else if (yeastStrain) {
+      // No backend state yet — pre-select based on project yeast
+      const resolvedId = _resolveYeastStrain(strains)
+      const match = strains.find(s => s.id === resolvedId)
       if (match) setSelectedStrain(match)
     }
   }, [liveState?.strain_id, strains])
