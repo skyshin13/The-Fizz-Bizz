@@ -1177,7 +1177,9 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
 
   // Merge live points and simulated curve into a single dataset for the chart
   const mergedChartData = useMemo(() => {
-    const visibleSim = windowH !== null ? simCurve.filter(p => p.hours_elapsed >= minH) : simCurve
+    const visibleSim = windowH !== null
+      ? simCurve.filter(p => p.hours_elapsed >= minH && p.hours_elapsed <= maxH + windowH)
+      : simCurve
     const map = new Map<string, { hours_elapsed: number; co2_psi?: number; predicted_psi?: number }>()
     for (const p of visiblePoints) {
       map.set(p.hours_elapsed.toFixed(3), { hours_elapsed: p.hours_elapsed, co2_psi: p.co2_psi })
@@ -1191,8 +1193,8 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
     return Array.from(map.values()).sort((a, b) => a.hours_elapsed - b.hours_elapsed)
   }, [visiblePoints, simCurve, windowH, minH])
 
-  // X-axis offset: subtract first visible point so labels always start near 0 when zoomed
-  const xOffset = windowH !== null && mergedChartData.length > 0 ? mergedChartData[0].hours_elapsed : 0
+  // X-axis offset: use minH directly so zoomed labels always read 0 → windowH
+  const xOffset = windowH !== null ? minH : 0
 
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
