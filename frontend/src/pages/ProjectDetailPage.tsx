@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
@@ -6,10 +6,13 @@ import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2 } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2, Globe, Lock } from 'lucide-react'
 import styles from './ProjectDetailPage.module.css'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
+
+const toF = (c: number) => Math.round((c * 9 / 5 + 32) * 10) / 10
+const toC = (f: number) => (f - 32) * 5 / 9
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -18,7 +21,7 @@ export default function ProjectDetailPage() {
   const [showMeasure, setShowMeasure] = useState(false)
   const [showNote, setShowNote] = useState(false)
   const [showComplete, setShowComplete] = useState(false)
-  const [activeChart, setActiveChart] = useState<'ph' | 'gravity' | 'co2'>('ph')
+  const [activeChart, setActiveChart] = useState<'ph' | 'gravity'>('ph')
   const [activeTab, setActiveTab] = useState<'log' | 'album' | 'cer'>('log')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [showReminder, setShowReminder] = useState(false)
@@ -27,11 +30,10 @@ export default function ProjectDetailPage() {
   const [nameInput, setNameInput] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
   const [descInput, setDescInput] = useState('')
-  const [editingYeast, setEditingYeast] = useState(false)
   const [yeastSearch, setYeastSearch] = useState('')
   const [yeastOptions, setYeastOptions] = useState<{ id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string }[]>([])
   const [yeastDropdown, setYeastDropdown] = useState(false)
-  const [savingYeast, setSavingYeast] = useState(false)
+  const [descSelectedYeast, setDescSelectedYeast] = useState<{ id: number; name: string; strain_code?: string; brand?: string } | null | undefined>(undefined)
   const { getEmoji } = useFermentationTypes()
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
@@ -59,7 +61,6 @@ export default function ProjectDetailPage() {
     ph: m.ph ?? null,
     sg: m.specific_gravity ?? null,
     abv: m.alcohol_by_volume ?? null,
-    co2: m.co2_psi ?? null,
     temp: m.temperature_celsius ?? null,
   }))
 
@@ -70,6 +71,8 @@ export default function ProjectDetailPage() {
 
   const ALCOHOL_TYPES = new Set(['beer', 'wine', 'mead', 'cider', 'alcohol_brewing'])
   const isAlcohol = ALCOHOL_TYPES.has(project.fermentation_type)
+  const CER_TYPES = new Set(['beer', 'wine', 'cider'])
+  const hasCer = CER_TYPES.has(project.fermentation_type)
 
   const finalAbv = (project.initial_gravity && project.final_gravity)
     ? Math.max(0, (project.initial_gravity - project.final_gravity) * 131.25)
@@ -135,93 +138,19 @@ export default function ProjectDetailPage() {
                 <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.625rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px' }}>{project.status}</span>
                 {daysSince != null && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Day {daysSince}</span>}
               </div>
-              {/* Yeast strain — view or edit */}
-              {editingYeast ? (
-                <div style={{ marginTop: '0.375rem', position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                      <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                      <input
-                        autoFocus
-                        value={yeastSearch}
-                        onChange={e => { setYeastSearch(e.target.value); setYeastDropdown(true) }}
-                        onFocus={() => setYeastDropdown(true)}
-                        onBlur={() => setTimeout(() => setYeastDropdown(false), 150)}
-                        placeholder="Search yeast strains…"
-                        style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '1.75rem', paddingRight: '0.75rem', paddingTop: '0.4rem', paddingBottom: '0.4rem', border: '1px solid var(--amber)', borderRadius: '6px', background: 'var(--card-bg)', fontSize: '0.78rem', outline: 'none' }}
-                      />
-                    </div>
-                    {project.yeast_strain && (
-                      <button
-                        onClick={async () => {
-                          setSavingYeast(true)
-                          try {
-                            await api.put(`/projects/${project.id}/yeast`, { yeast_id: null })
-                            await load()
-                            toast.success('Yeast strain removed')
-                          } catch { toast.error('Failed to update yeast strain') }
-                          finally { setSavingYeast(false); setEditingYeast(false); setYeastSearch('') }
-                        }}
-                        title="Remove yeast strain"
-                        style={{ padding: '0.3rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                      >
-                        Remove
-                      </button>
-                    )}
-                    <button onClick={() => { setEditingYeast(false); setYeastSearch('') }} style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
-                      <X size={14} />
-                    </button>
-                  </div>
-                  {yeastDropdown && yeastOptions.filter(y => !yeastSearch || y.name.toLowerCase().includes(yeastSearch.toLowerCase()) || (y.brand?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false) || (y.strain_code?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false)).slice(0, 8).length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-md)', marginTop: 2, maxHeight: '200px', overflowY: 'auto' }}>
-                      {yeastOptions.filter(y => !yeastSearch || y.name.toLowerCase().includes(yeastSearch.toLowerCase()) || (y.brand?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false) || (y.strain_code?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false)).slice(0, 8).map(y => (
-                        <button
-                          key={y.id}
-                          onMouseDown={async () => {
-                            setSavingYeast(true)
-                            try {
-                              await api.put(`/projects/${project.id}/yeast`, { yeast_id: y.id })
-                              await load()
-                              toast.success(`Yeast set to ${y.name}`)
-                            } catch { toast.error('Failed to update yeast strain') }
-                            finally { setSavingYeast(false); setEditingYeast(false); setYeastSearch('') }
-                          }}
-                          style={{ width: '100%', textAlign: 'left', padding: '0.5rem 0.875rem', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', fontSize: '0.8rem' }}
-                        >
-                          <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                            {y.name}{y.strain_code && <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '0.3rem' }}>({y.strain_code})</span>}
-                          </div>
-                          {y.brand && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{y.brand}{y.yeast_type ? ` · ${y.yeast_type}` : ''}</div>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {savingYeast && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>Saving…</p>}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.375rem' }}>
-                  <FlaskConical size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  {project.yeast_strain ? (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {project.yeast_strain.name}
-                      {project.yeast_strain.strain_code && <span style={{ fontFamily: 'monospace', marginLeft: '0.3rem', opacity: 0.75 }}>({project.yeast_strain.strain_code})</span>}
-                      {project.yeast_strain.brand && <span style={{ marginLeft: '0.3rem', opacity: 0.75 }}>· {project.yeast_strain.brand}</span>}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No yeast strain set</span>
-                  )}
-                  <button
-                    onClick={() => {
-                      if (yeastOptions.length === 0) api.get('/yeasts/').then(r => setYeastOptions(r.data)).catch(() => {})
-                      setEditingYeast(true)
-                    }}
-                    title="Edit yeast strain"
-                    style={{ padding: '0.2rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
-                  >
-                    <Pencil size={11} />
-                  </button>
-                </div>
-              )}
+              {/* Yeast strain display */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.375rem' }}>
+                <FlaskConical size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                {project.yeast_strain ? (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {project.yeast_strain.name}
+                    {project.yeast_strain.strain_code && <span style={{ fontFamily: 'monospace', marginLeft: '0.3rem', opacity: 0.75 }}>({project.yeast_strain.strain_code})</span>}
+                    {project.yeast_strain.brand && <span style={{ marginLeft: '0.3rem', opacity: 0.75 }}>· {project.yeast_strain.brand}</span>}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No yeast strain set</span>
+                )}
+              </div>
             </div>
           </div>
           <div className={styles.actionButtons}>
@@ -245,9 +174,23 @@ export default function ProjectDetailPage() {
                 <Bell size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Set Reminder
               </button>
             </div>
-            {/* Row 3: Share link (only if public) */}
-            {project.is_public && (
-              <div style={{ display: 'flex', gap: '0.625rem' }}>
+            {/* Row 3: Visibility toggle + Share link */}
+            <div style={{ display: 'flex', gap: '0.625rem' }}>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.patch(`/projects/${project.id}`, { is_public: !project.is_public })
+                    await load()
+                    toast.success(project.is_public ? 'Project set to private' : 'Project is now public')
+                  } catch {
+                    toast.error('Failed to update visibility')
+                  }
+                }}
+                style={{ padding: '0.5rem 1rem', border: `1px solid ${project.is_public ? 'var(--border)' : 'var(--moss)'}`, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, color: project.is_public ? 'var(--text-secondary)' : 'var(--moss)', background: 'var(--card-bg)', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                {project.is_public ? <><Lock size={14} /> Make Private</> : <><Globe size={14} /> Make Public</>}
+              </button>
+              {project.is_public && (
                 <button
                   onClick={() => {
                     const url = `${window.location.origin}/share/${project.id}`
@@ -257,8 +200,8 @@ export default function ProjectDetailPage() {
                 >
                   <Share2 size={14} /> Copy Share Link
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -271,13 +214,21 @@ export default function ProjectDetailPage() {
               e.preventDefault()
               const trimmed = descInput.trim()
               try {
-                await api.patch(`/projects/${project.id}`, { description: trimmed || null })
+                const calls: Promise<unknown>[] = [
+                  api.patch(`/projects/${project.id}`, { description: trimmed || null })
+                ]
+                if (descSelectedYeast !== undefined) {
+                  calls.push(api.put(`/projects/${project.id}/yeast`, { yeast_id: descSelectedYeast?.id ?? null }))
+                }
+                await Promise.all(calls)
                 await load()
-                toast.success('Description updated')
+                toast.success('Updated')
               } catch {
-                toast.error('Failed to update description')
+                toast.error('Failed to save changes')
               } finally {
                 setEditingDesc(false)
+                setDescSelectedYeast(undefined)
+                setYeastSearch('')
               }
             }}
           >
@@ -289,9 +240,69 @@ export default function ProjectDetailPage() {
               rows={3}
               style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.625rem', border: '1px solid var(--amber)', borderRadius: '8px', background: 'var(--card-bg)', color: 'var(--text-primary)', fontSize: '0.875rem', lineHeight: 1.7, resize: 'vertical', outline: 'none' }}
             />
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            {/* Yeast strain selector */}
+            <div style={{ marginTop: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <FlaskConical size={12} />
+                Yeast Strain
+              </div>
+              {(() => {
+                const currentYeast = descSelectedYeast !== undefined ? descSelectedYeast : project.yeast_strain
+                const filtered = yeastOptions.filter(y =>
+                  !yeastSearch ||
+                  y.name.toLowerCase().includes(yeastSearch.toLowerCase()) ||
+                  (y.brand?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false) ||
+                  (y.strain_code?.toLowerCase().includes(yeastSearch.toLowerCase()) ?? false)
+                ).slice(0, 8)
+                return (
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                        <input
+                          value={yeastSearch}
+                          onChange={e => { setYeastSearch(e.target.value); setYeastDropdown(true) }}
+                          onFocus={() => setYeastDropdown(true)}
+                          onBlur={() => setTimeout(() => setYeastDropdown(false), 150)}
+                          placeholder={currentYeast ? `${currentYeast.name}${currentYeast.strain_code ? ` (${currentYeast.strain_code})` : ''}` : 'Search yeast strains…'}
+                          style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '1.75rem', paddingRight: '0.75rem', paddingTop: '0.4rem', paddingBottom: '0.4rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--card-bg)', fontSize: '0.78rem', outline: 'none', color: 'var(--text-primary)' }}
+                        />
+                      </div>
+                      {currentYeast && (
+                        <button
+                          type="button"
+                          onClick={() => { setDescSelectedYeast(null); setYeastSearch('') }}
+                          title="Remove yeast strain"
+                          style={{ padding: '0.3rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {yeastDropdown && filtered.length > 0 && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-md)', marginTop: 2, maxHeight: '200px', overflowY: 'auto' }}>
+                        {filtered.map(y => (
+                          <button
+                            key={y.id}
+                            type="button"
+                            onMouseDown={() => { setDescSelectedYeast(y); setYeastSearch(''); setYeastDropdown(false) }}
+                            style={{ width: '100%', textAlign: 'left', padding: '0.5rem 0.875rem', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', fontSize: '0.8rem' }}
+                          >
+                            <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                              {y.name}{y.strain_code && <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '0.3rem' }}>({y.strain_code})</span>}
+                            </div>
+                            {y.brand && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{y.brand}{y.yeast_type ? ` · ${y.yeast_type}` : ''}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
               <button type="submit" style={{ padding: '0.35rem 0.875rem', background: 'var(--amber)', border: 'none', borderRadius: '6px', cursor: 'pointer', color: 'var(--brown-dark)', fontWeight: 600, fontSize: '0.8rem' }}>Save</button>
-              <button type="button" onClick={() => setEditingDesc(false)} style={{ padding: '0.35rem 0.875rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Cancel</button>
+              <button type="button" onClick={() => { setEditingDesc(false); setDescSelectedYeast(undefined); setYeastSearch('') }} style={{ padding: '0.35rem 0.875rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Cancel</button>
             </div>
           </form>
         ) : (
@@ -302,7 +313,13 @@ export default function ProjectDetailPage() {
               <p style={{ flex: 1, fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontStyle: 'italic' }}>No description yet.</p>
             )}
             <button
-              onClick={() => { setDescInput(project.description || ''); setEditingDesc(true) }}
+              onClick={() => {
+                setDescInput(project.description || '')
+                setDescSelectedYeast(undefined)
+                setYeastSearch('')
+                if (yeastOptions.length === 0) api.get('/yeasts/').then(r => setYeastOptions(r.data)).catch(() => {})
+                setEditingDesc(true)
+              }}
               title="Edit description"
               style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', borderRadius: '6px', flexShrink: 0 }}
             >
@@ -315,7 +332,7 @@ export default function ProjectDetailPage() {
             {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
             {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
             {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
-            {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
+            {project.fermentation_temp_celsius && <Detail label="Temp" value={`${toF(project.fermentation_temp_celsius)}°F`} />}
             {project.yeast_strain && (
               <Detail
                 label="Yeast Strain"
@@ -341,7 +358,7 @@ export default function ProjectDetailPage() {
               color: 'var(--rust)',
             },
           ] : []),
-          { label: 'Temp (°C)', value: latestM?.temperature_celsius?.toFixed(1), icon: Thermometer, color: 'var(--slate)' },
+          { label: 'Temp (°F)', value: latestM?.temperature_celsius != null ? String(toF(latestM.temperature_celsius)) : undefined, icon: Thermometer, color: 'var(--slate)' },
         ]
         return (
       <div className={`fade-in-delay-1 ${styles.statsGrid}`} style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
@@ -369,7 +386,6 @@ export default function ProjectDetailPage() {
               {([
                 ['ph',  'pH',  '#4a6741'],
                 ...(isAlcohol ? [['gravity', 'SG', '#c8832a']] : []),
-                ['co2', 'CO₂', '#3d4e5c'],
               ] as const).map(([key, label, color]) => (
                 <button
                   key={key}
@@ -410,21 +426,14 @@ export default function ProjectDetailPage() {
               })()}
               <YAxis
                 tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
-                domain={
-                  activeChart === 'ph' ? [0, 14] :
-                  activeChart === 'gravity' ? ['auto', 'auto'] :
-                  ['auto', 'auto']
-                }
-                tickFormatter={v =>
-                  activeChart === 'gravity' ? v.toFixed(3) : v
-                }
+                domain={activeChart === 'ph' ? [0, 14] : ['auto', 'auto']}
+                tickFormatter={v => activeChart === 'gravity' ? v.toFixed(3) : v}
               />
               <Tooltip
                 contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }}
                 formatter={(value: number) =>
                   activeChart === 'ph' ? [`${value} pH`, 'pH'] :
-                  activeChart === 'gravity' ? [value.toFixed(3), 'Specific Gravity'] :
-                  [`${value} psi`, 'CO₂']
+                  [value.toFixed(3), 'Specific Gravity']
                 }
                 labelFormatter={(label) => `${(label / 60).toFixed(1)} hours elapsed`}
               />
@@ -436,11 +445,6 @@ export default function ProjectDetailPage() {
               {activeChart === 'gravity' && (
                 <Line type="monotone" dataKey="sg" name="SG" stroke="#c8832a" strokeWidth={2.5}
                   dot={{ fill: '#c8832a', r: 5, strokeWidth: 0 }}
-                  activeDot={{ r: 7 }} connectNulls />
-              )}
-              {activeChart === 'co2' && (
-                <Line type="monotone" dataKey="co2" name="CO₂" stroke="#3d4e5c" strokeWidth={2.5}
-                  dot={{ fill: '#3d4e5c', r: 5, strokeWidth: 0 }}
                   activeDot={{ r: 7 }} connectNulls />
               )}
             </LineChart>
@@ -457,7 +461,7 @@ export default function ProjectDetailPage() {
           {([
             ['log', 'Notes & Log'],
             ['album', `Album (${photos.length})`],
-            ...(isAlcohol ? [['cer', 'CO₂ Production']] : []),
+            ...(hasCer ? [['cer', 'CO₂ Production']] : []),
           ] as const).map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab as 'log' | 'album' | 'cer')} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
               {label}
@@ -508,7 +512,7 @@ export default function ProjectDetailPage() {
                       {isAlcohol && <span style={{ color: 'var(--text-secondary)' }}>{m.specific_gravity ? `SG ${m.specific_gravity}` : '—'}</span>}
                       {isAlcohol && <span style={{ color: 'var(--text-secondary)' }}>{m.alcohol_by_volume ? `${m.alcohol_by_volume.toFixed(1)}% ABV` : '—'}</span>}
                       <span style={{ color: 'var(--text-secondary)' }}>{m.co2_psi ? `${m.co2_psi} psi` : '—'}</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{m.temperature_celsius ? `${m.temperature_celsius}°C` : '—'}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{m.temperature_celsius ? `${toF(m.temperature_celsius)}°F` : '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -540,11 +544,14 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {activeTab === 'cer' && isAlcohol && (
+        {activeTab === 'cer' && hasCer && (
           <div style={{ padding: '1.5rem' }}>
             <CERTab
               projectId={parseInt(id!)}
               startDate={project.start_date}
+              initialGravity={project.initial_gravity}
+              batchSizeLiters={project.batch_size_liters}
+              fermentationTempCelsius={project.fermentation_temp_celsius}
             />
           </div>
         )}
@@ -580,7 +587,7 @@ export default function ProjectDetailPage() {
             {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
             {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
             {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
-            {project.fermentation_temp_celsius && <Detail label="Temp" value={`${project.fermentation_temp_celsius}°C`} />}
+            {project.fermentation_temp_celsius && <Detail label="Temp" value={`${toF(project.fermentation_temp_celsius)}°F`} />}
             {project.yeast_strain && (
               <Detail
                 label="Yeast Strain"
@@ -628,7 +635,7 @@ function MeasurementModal({ projectId, isAlcohol, onClose, onAdded }: { projectI
       await api.post(`/projects/${projectId}/measurements`, {
         specific_gravity: form.specific_gravity ? parseFloat(form.specific_gravity) : undefined,
         ph: form.ph ? parseFloat(form.ph) : undefined,
-        temperature_celsius: form.temperature_celsius ? parseFloat(form.temperature_celsius) : undefined,
+        temperature_celsius: form.temperature_celsius ? toC(parseFloat(form.temperature_celsius)) : undefined,
         co2_psi: form.co2_psi ? parseFloat(form.co2_psi) : undefined,
         notes: form.notes || undefined,
       })
@@ -648,7 +655,7 @@ function MeasurementModal({ projectId, isAlcohol, onClose, onAdded }: { projectI
           {[
             ...(isAlcohol ? [{ label: 'Specific Gravity', key: 'specific_gravity' as const, placeholder: '1.010', step: '0.001' }] : []),
             { label: 'pH', key: 'ph' as const, placeholder: '4.5', step: '0.1' },
-            { label: 'Temperature (°C)', key: 'temperature_celsius' as const, placeholder: '20.0', step: '0.1' },
+            { label: 'Temperature (°F)', key: 'temperature_celsius' as const, placeholder: '68', step: '0.5' },
             { label: 'CO₂ (PSI)', key: 'co2_psi' as const, placeholder: '6.5', step: '0.1' },
           ].map(f => (
             <div key={f.key}>
@@ -879,23 +886,36 @@ const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59
 const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
 const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
 
-function CERTab({ projectId, startDate }: { projectId: number; startDate?: string }) {
+function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius }: {
+  projectId: number
+  startDate?: string
+  initialGravity?: number
+  batchSizeLiters?: number
+  fermentationTempCelsius?: number
+}) {
   const [strains, setStrains]           = useState<CERStrain[]>([])
   const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
   const [strainSearch, setStrainSearch] = useState('')
   const [showList, setShowList]         = useState(false)
   const [showInfo, setShowInfo]         = useState(false)
 
-  // Editable params (initialised from backend state on first load)
-  const [sugar, setSugar]         = useState('200')
-  const [volume, setVolume]       = useState('5000')
-  const [temp, setTemp]           = useState('20')
-  const [threshold, setThreshold] = useState('150')  // CER alert in mg/L/h (frontend-only)
-  const [interval, setInterval]   = useState('30')   // tick interval in seconds
+  // Derive initial param defaults from project creation data — same formula as backend _create_initial_state
+  const _vol   = batchSizeLiters ?? 19.0
+  const _og    = initialGravity  ?? 1.050
+  const _sugar = Math.max(50, (_og - 1.0) * 2500 * _vol)
+  const _tempF = toF(fermentationTempCelsius ?? 20.0)
+
+  // Editable params (initialised from project data; overridden by backend state on first load)
+  const [sugar, setSugar]         = useState(String(Math.round(_sugar)))
+  const [volume, setVolume]       = useState(String(Math.round(_vol * 10) / 10))
+  const [temp, setTemp]           = useState(String(Math.round(_tempF * 10) / 10))
+  const [threshold, setThreshold]   = useState('1500')  // CER alert in mg/L/h (frontend-only)
+  const [intervalSecs, setIntervalSecs] = useState('30')   // tick interval in seconds
 
   // Live data from the database
   const [points, setPoints]       = useState<LiveCERPoint[]>([])
   const [liveState, setLiveState] = useState<LiveCERState | null>(null)
+  const [simCurve, setSimCurve]   = useState<{ hours_elapsed: number; predicted_psi: number }[]>([])
   const [loading, setLoading]     = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [releasing, setReleasing] = useState(false)
@@ -908,23 +928,71 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   const [showCustom, setShowCustom]     = useState(false)
 
   // ── Fetch live data from database ──────────────────────────────────────────
-  const fetchData = async () => {
+  // Returns the fresh LiveCERState so callers don't read stale closure values.
+  const fetchData = async (): Promise<LiveCERState | null> => {
     try {
       const res = await api.get(`/calculations/live-cer/${projectId}`)
+      const freshState: LiveCERState | null = res.data.state ?? null
       setPoints(res.data.points ?? [])
-      setLiveState(res.data.state ?? null)
+      setLiveState(freshState)
       setLastUpdated(new Date())
-      // Sync controls from backend state on first load only
-      if (!initialised.current && res.data.state) {
-        const s: LiveCERState = res.data.state
-        setSugar(String(Math.round(s.sugar_g)))
-        setVolume(String(Math.round(s.volume_ml)))
-        setTemp(String(s.temperature_c))
-        setInterval(String(s.interval_seconds ?? 30))
-        initialised.current = true
+      if (!initialised.current) {
+        if (freshState) {
+          setSugar(String(Math.round(freshState.sugar_g)))
+          setVolume(String(Math.round(freshState.volume_ml / 1000 * 10) / 10))
+          setTemp(String(Math.round(toF(freshState.temperature_c) * 10) / 10))
+          setIntervalSecs(String(freshState.interval_seconds ?? 30))
+          initialised.current = true
+          runSim({ strain_id: freshState.strain_id, sugar_g: freshState.sugar_g, volume_ml: freshState.volume_ml, temperature_c: freshState.temperature_c }, freshState)
+        } else {
+          runSim({ strain_id: 'US-05', sugar_g: _sugar, volume_ml: _vol * 1000, temperature_c: fermentationTempCelsius ?? 20.0 }, null)
+        }
       }
+      return freshState
     } catch { /* silent — offline */ }
     finally { setLoading(false) }
+    return null
+  }
+
+  // Run the CER simulation and build the predicted curve.
+  // If anchorState is provided the curve is trimmed to start at elapsed_hours
+  // and shifted vertically so it begins at current_psi — the orange line never
+  // jumps because the gray line always continues from where live data ends.
+  const runSim = async (
+    p: { strain_id: string; sugar_g: number; volume_ml: number; temperature_c: number },
+    anchorState: LiveCERState | null | undefined,
+  ) => {
+    const elapsed = anchorState?.elapsed_hours ?? 0
+    const duration = Math.max(elapsed + 72, 120)
+    try {
+      const res = await api.post('/calculations/cer', {
+        strain_id: p.strain_id,
+        sugar_g: p.sugar_g,
+        volume_ml: p.volume_ml,
+        temperature_c: p.temperature_c,
+        duration_hours: duration,
+        alert_threshold: 9999,
+      })
+      let cumPsi = 0
+      const full = (res.data.points as { t: number; cer: number }[]).map((pt, i, arr) => {
+        const dt = i > 0 ? pt.t - arr[i - 1].t : 0.5
+        cumPsi += pt.cer * dt / 3000.0
+        return { t: pt.t, psi: parseFloat(cumPsi.toFixed(4)) }
+      })
+
+      if (!anchorState || elapsed === 0) {
+        setSimCurve(full.map(p => ({ hours_elapsed: p.t, predicted_psi: p.psi })))
+        return
+      }
+
+      // Align: shift the curve so the predicted PSI at elapsed_hours equals current_psi
+      const anchor = full.find(p => p.t >= elapsed) ?? full[full.length - 1]
+      const offset = (anchorState.current_psi ?? 0) - anchor.psi
+      const futureCurve = full
+        .filter(p => p.t >= elapsed - 0.25)
+        .map(p => ({ hours_elapsed: p.t, predicted_psi: parseFloat(Math.max(0, p.psi + offset).toFixed(4)) }))
+      setSimCurve(futureCurve)
+    } catch { /* silent */ }
   }
 
   // Load strains once (for picker)
@@ -940,25 +1008,30 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
     }
   }, [liveState?.strain_id, strains])
 
-  // Poll every 30 s — matches backend tick interval
+  // Poll every 60 s — matches backend tick interval
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
+    const timerId = window.setInterval(fetchData, 60000)
+    return () => window.clearInterval(timerId)
   }, [projectId])
 
   // ── Send updated params to backend ─────────────────────────────────────────
   const patchParams = async (overrides?: { strain_id?: string; interval_seconds?: number }) => {
     setPatching(true)
+    const strainId  = overrides?.strain_id ?? selectedStrain?.id ?? liveState?.strain_id ?? 'US-05'
+    const sugarG    = parseFloat(sugar) || _sugar
+    const volumeMl  = parseFloat(volume) ? parseFloat(volume) * 1000 : _vol * 1000
+    const tempC     = parseFloat(temp) ? toC(parseFloat(temp)) : (fermentationTempCelsius ?? 20.0)
     try {
       await api.patch(`/calculations/cer-params/${projectId}`, {
-        strain_id:        overrides?.strain_id ?? selectedStrain?.id,
-        sugar_g:          parseFloat(sugar)    || undefined,
-        volume_ml:        parseFloat(volume)   || undefined,
-        temperature_c:    parseFloat(temp)     || undefined,
-        interval_seconds: overrides?.interval_seconds ?? (parseInt(interval) || undefined),
+        strain_id:        strainId,
+        sugar_g:          sugarG,
+        volume_ml:        volumeMl,
+        temperature_c:    tempC,
+        interval_seconds: overrides?.interval_seconds ?? (parseInt(intervalSecs) || undefined),
       })
-      await fetchData()
+      const freshState = await fetchData()
+      runSim({ strain_id: strainId, sugar_g: sugarG, volume_ml: volumeMl, temperature_c: tempC }, freshState)
     } catch { toast.error('Could not update simulation params') }
     finally { setPatching(false) }
   }
@@ -975,7 +1048,7 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   }
 
   // Derived values
-  const alertNum      = parseFloat(threshold) || 150
+  const alertNum      = parseFloat(threshold) || 1500
   const isAlerting    = (liveState?.current_cer_estimate ?? 0) > alertNum
   const secsSincePoll = lastUpdated ? Math.round((Date.now() - lastUpdated.getTime()) / 1000) : null
 
@@ -985,6 +1058,22 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
   const minH    = windowH !== null ? Math.max(0, maxH - windowH) : 0
   const visiblePoints = windowH !== null ? points.filter(p => p.hours_elapsed >= minH) : points
   const xDomain: [number | string, number | string] = windowH !== null ? [minH, maxH] : ['dataMin', 'dataMax']
+
+  // Merge live points and simulated curve into a single dataset for the chart
+  const mergedChartData = useMemo(() => {
+    const visibleSim = windowH !== null ? simCurve.filter(p => p.hours_elapsed >= minH) : simCurve
+    const map = new Map<string, { hours_elapsed: number; co2_psi?: number; predicted_psi?: number }>()
+    for (const p of visiblePoints) {
+      map.set(p.hours_elapsed.toFixed(3), { hours_elapsed: p.hours_elapsed, co2_psi: p.co2_psi })
+    }
+    for (const p of visibleSim) {
+      const key = p.hours_elapsed.toFixed(3)
+      const existing = map.get(key)
+      if (existing) existing.predicted_psi = p.predicted_psi
+      else map.set(key, { hours_elapsed: p.hours_elapsed, predicted_psi: p.predicted_psi })
+    }
+    return Array.from(map.values()).sort((a, b) => a.hours_elapsed - b.hours_elapsed)
+  }, [visiblePoints, simCurve, windowH, minH])
 
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
@@ -1047,11 +1136,11 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
         <div><label style={cerLabel}>Sugar (g)</label>
           <input type="number" step="10" value={sugar} onChange={e => setSugar(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
         </div>
-        <div><label style={cerLabel}>Volume (mL)</label>
-          <input type="number" step="100" value={volume} onChange={e => setVolume(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
+        <div><label style={cerLabel}>Volume (L)</label>
+          <input type="number" step="0.5" value={volume} onChange={e => setVolume(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
         </div>
-        <div><label style={cerLabel}>Temperature (°C)</label>
-          <input type="number" step="0.5" value={temp} onChange={e => setTemp(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
+        <div><label style={cerLabel}>Temperature (°F)</label>
+          <input type="number" step="1" value={temp} onChange={e => setTemp(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
         </div>
         <div>
           <label style={cerLabel}>CER Alert (mg/L/h)</label>
@@ -1061,9 +1150,9 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
         <div>
           <label style={cerLabel}>Update Interval</label>
           <select
-            value={interval}
+            value={intervalSecs}
             onChange={e => {
-              setInterval(e.target.value)
+              setIntervalSecs(e.target.value)
               patchParams({ interval_seconds: parseInt(e.target.value) })
             }}
             style={{ ...cerInput, cursor: 'pointer' }}
@@ -1194,13 +1283,13 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-muted)', gap: '0.5rem', flexDirection: 'column' }}>
               <Wind size={30} style={{ opacity: 0.2 }} />
               <p style={{ fontSize: '0.8rem', margin: 0 }}>Simulation starting…</p>
-              <p style={{ fontSize: '0.72rem', margin: 0, opacity: 0.6 }}>First data point arrives within 5 seconds.</p>
+              <p style={{ fontSize: '0.72rem', margin: 0, opacity: 0.6 }}>First data point arrives within 60 seconds.</p>
             </div>
           )}
 
           {!loading && points.length > 0 && (
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={visiblePoints} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <LineChart data={mergedChartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="hours_elapsed"
@@ -1218,12 +1307,23 @@ function CERTab({ projectId, startDate }: { projectId: number; startDate?: strin
                 />
                 <Tooltip
                   contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }}
-                  formatter={(v: number) => [`${v.toFixed(3)} PSI`, 'CO₂ Pressure']}
+                  formatter={(v: number, name: string) => [`${v.toFixed(3)} PSI`, name === 'predicted_psi' ? 'Predicted' : 'Live']}
                   labelFormatter={(h: number) => `Hour ${h.toFixed(1)} since start`}
                 />
+                <Line type="monotone" dataKey="predicted_psi" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 3" dot={false} isAnimationActive={false} />
                 <Line type="monotone" dataKey="co2_psi" stroke="var(--amber)" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
+          )}
+          {simCurve.length > 0 && (
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.375rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <span style={{ width: 16, height: 2, background: 'var(--amber)', display: 'inline-block' }} /> Live
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <span style={{ width: 16, height: 2, background: '#94a3b8', display: 'inline-block', borderTop: '2px dashed #94a3b8' }} /> Predicted
+              </span>
+            </div>
           )}
         </div>
 
