@@ -138,12 +138,14 @@ function ProjectRow({ project, onDelete, getEmoji }: { project: Project; onDelet
 
   return (
     <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', position: 'relative' }}>
-      {project.cover_photo_url && (
-        <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }} />
-      )}
+
       <Link to={`/projects/${project.id}`} style={{ display: 'block', padding: '1.25rem' }}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-          <span style={{ fontSize: '2.25rem', lineHeight: 1, flexShrink: 0 }}>{getEmoji(project.fermentation_type)}</span>
+          {project.cover_photo_url ? (
+            <img src={project.cover_photo_url} alt={project.name} style={{ width: 60, height: 60, borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+          ) : (
+            <span style={{ fontSize: '2.25rem', lineHeight: 1, flexShrink: 0 }}>{getEmoji(project.fermentation_type)}</span>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
               <h3 style={{ fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.name}</h3>
@@ -232,7 +234,6 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
     setLoading(true)
     try {
       let cover_photo_url: string | undefined
-
       if (photoFile && user) {
         const ext = photoFile.name.split('.').pop()
         const path = `${user.id}/${Date.now()}.${ext}`
@@ -246,7 +247,6 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
           cover_photo_url = urlData.publicUrl
         }
       }
-
       await api.post('/projects/', {
         ...form,
         cover_photo_url,

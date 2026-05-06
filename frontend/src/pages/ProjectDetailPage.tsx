@@ -81,12 +81,7 @@ export default function ProjectDetailPage() {
 
   return (
     <div className={styles.page}>
-      {/* Cover photo */}
-      {project.cover_photo_url && (
-        <div style={{ margin: '-2.5rem -2.5rem 1.75rem', height: '240px', overflow: 'hidden' }}>
-          <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        </div>
-      )}
+
 
       {/* Header */}
       <div className="fade-in" style={{ marginBottom: '2rem', position: 'relative', zIndex: 2 }}>

@@ -105,12 +105,6 @@ export default function PublicProjectViewPage() {
         <ArrowLeft size={15} /> Back
       </button>
 
-      {/* Cover photo */}
-      {project.cover_photo_url && (
-        <div style={{ borderRadius: '14px', overflow: 'hidden', marginBottom: '1.5rem', height: '240px' }}>
-          <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-      )}
 
       {/* Header */}
       <div className="fade-in" style={{ marginBottom: '1.5rem' }}>
