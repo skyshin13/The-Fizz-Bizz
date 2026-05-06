@@ -18,6 +18,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterVisibility, setFilterVisibility] = useState<string>('all')
+  const [filterType, setFilterType] = useState<string>('all')
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -26,11 +27,21 @@ export default function ProjectsPage() {
   const load = () => api.get('/projects/').then(r => setProjects(r.data)).finally(() => setLoading(false))
   useEffect(() => { load() }, [])
 
+  // Fermentation types that actually have projects
+  const presentTypes = types.filter(t => projects.some(p => p.fermentation_type === t.value))
+
   const filtered = projects.filter(p => {
+    if (filterType !== 'all' && p.fermentation_type !== filterType) return false
     if (filterStatus !== 'all' && p.status !== filterStatus) return false
     if (filterVisibility === 'public' && !p.is_public) return false
     if (filterVisibility === 'private' && p.is_public) return false
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const matches = p.name.toLowerCase().includes(q)
+        || (p.description?.toLowerCase().includes(q) ?? false)
+        || (p.notes?.toLowerCase().includes(q) ?? false)
+      if (!matches) return false
+    }
     return true
   })
 
@@ -61,11 +72,34 @@ export default function ProjectsPage() {
         </button>
       </div>
 
+      {/* Category strip — fermentation types */}
+      {presentTypes.length > 0 && (
+        <div className="fade-in-delay-1" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <button
+            onClick={() => setFilterType('all')}
+            style={{ padding: '0.45rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 500, border: '1px solid var(--border)', background: filterType === 'all' ? 'var(--brown-dark)' : 'var(--card-bg)', color: filterType === 'all' ? 'var(--amber-glow)' : 'var(--text-secondary)', transition: 'all 0.15s' }}
+          >
+            All
+          </button>
+          {presentTypes.map(t => (
+            <button
+              key={t.value}
+              onClick={() => setFilterType(filterType === t.value ? 'all' : t.value)}
+              style={{ padding: '0.45rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 500, border: '1px solid var(--border)', background: filterType === t.value ? 'var(--brown-dark)' : 'var(--card-bg)', color: filterType === t.value ? 'var(--amber-glow)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem', transition: 'all 0.15s' }}
+            >
+              <span>{t.emoji}</span>
+              <span>{t.label}</span>
+              <span style={{ fontSize: '0.7rem', opacity: 0.65 }}>({projects.filter(p => p.fermentation_type === t.value).length})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Filters */}
       <div className={`fade-in-delay-1 ${styles.filters}`}>
         <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
           <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ width: '100%', paddingLeft: '2rem', padding: '0.6rem 0.875rem 0.6rem 2.25rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--card-bg)', fontSize: '0.875rem' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, description, or notes..." style={{ width: '100%', paddingLeft: '2rem', padding: '0.6rem 0.875rem 0.6rem 2.25rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--card-bg)', fontSize: '0.875rem' }} />
         </div>
         <div className={styles.filterButtons}>
           {['all', 'active', 'completed'].map(s => (
