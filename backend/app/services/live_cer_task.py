@@ -30,8 +30,8 @@ from app.services.cer_engine import (
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-INTERVAL_SECONDS    = 5
-CO2_TO_PSI          = 300.0     # converts Σ(cer·dt) → PSI
+INTERVAL_SECONDS    = 60
+CO2_TO_PSI          = 3000.0    # converts Σ(cer·dt) → PSI (scaled for Yco2/Yxs-based CER)
 DEFAULT_STRAIN      = "US-05"
 SUPPORTED_TYPES     = {"beer", "mead", "cider", "wine", "alcohol_brewing"}
 BACKFILL_INTERVAL_H = 1.0       # one backfill point per hour for offline gaps

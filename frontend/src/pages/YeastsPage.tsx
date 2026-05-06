@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
 import { YeastProfile } from '../types'
-import { Dna, Thermometer, FlaskConical, Search, AlertCircle, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Dna, Thermometer, FlaskConical, Search, AlertCircle, X, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react'
 import styles from './YeastsPage.module.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ export default function YeastsPage() {
           <p style={{ fontSize: '0.875rem' }}>Loading strains…</p>
         </div>
       ) : (
-        <div className={`fade-in-delay-1 ${styles.layout}`}>
+        <div className={`fade-in-delay-1 ${styles.layout}${selected ? ` ${styles.panelOpen}` : ''}`}>
 
           {/* Left: strain list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
@@ -365,7 +365,11 @@ function DetailPanel({ yeast, onClose }: { yeast: YeastProfile; onClose: () => v
     <div style={{
       background: 'var(--card-bg)', borderRadius: '14px', padding: '1.5rem',
       border: '1px solid var(--amber)', position: 'sticky', top: '1.5rem',
+      maxHeight: 'calc(100vh - 3rem)', overflowY: 'auto',
     }}>
+      <button className={styles.backButton} onClick={onClose}>
+        <ArrowLeft size={14} /> Back to strains
+      </button>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
         <div style={{ flex: 1, minWidth: 0 }}>

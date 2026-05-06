@@ -178,6 +178,151 @@ def parse_duration(text: str) -> int | None:
     return None
 
 
+# ── Listicle detection & scraper ─────────────────────────────────────────────
+
+def is_listicle(soup: BeautifulSoup) -> bool:
+    """Return True if the page has 3+ numbered recipe sections (e.g. '1. American Pale Ale')."""
+    count = 0
+    for heading in soup.find_all(['h2', 'h3']):
+        if re.match(r'^\d+[.)]\s+\w', heading.get_text(strip=True)):
+            count += 1
+    return count >= 3
+
+
+def scrape_listicle(url: str, soup: BeautifulSoup) -> list[dict]:
+    """Parse a listicle page into individual recipe dicts, one per numbered section."""
+    numbered_headings = [
+        h for h in soup.find_all(['h2', 'h3'])
+        if re.match(r'^\d+[.)]\s+\w', h.get_text(strip=True))
+    ]
+
+    recipes = []
+    for heading in numbered_headings:
+        name = re.sub(r'^\d+[.)]\s+', '', heading.get_text(strip=True)).strip()
+
+        # Collect all sibling elements until the next numbered heading
+        elements = []
+        sibling = heading.find_next_sibling()
+        while sibling:
+            sib_text = sibling.get_text(strip=True) if hasattr(sibling, 'get_text') else ''
+            if sibling.name in ('h2', 'h3') and re.match(r'^\d+[.)]\s+\w', sib_text):
+                break
+            elements.append(sibling)
+            sibling = sibling.find_next_sibling()
+
+        if not elements:
+            continue
+
+        section_text = ' '.join(
+            el.get_text(separator=' ', strip=True) for el in elements if hasattr(el, 'get_text')
+        )
+
+        # Description: first substantial paragraph before any sub-heading
+        description = None
+        for el in elements:
+            if el.name in ('h3', 'h4'):
+                break
+            if el.name == 'p':
+                text = el.get_text(strip=True)
+                if len(text) > 20:
+                    description = text[:500]
+                    break
+
+        batch_size = parse_batch_size(section_text)
+        duration = parse_duration(section_text)
+        fermentation_type = infer_fermentation_type(name, section_text)
+
+        difficulty = 'beginner'
+        if 'advanced' in section_text.lower() or 'expert' in section_text.lower():
+            difficulty = 'advanced'
+        elif 'intermediate' in section_text.lower():
+            difficulty = 'intermediate'
+
+        # Instructions: first <ol> in section
+        instructions = None
+        for el in elements:
+            if el.name == 'ol':
+                steps = [li.get_text(strip=True) for li in el.find_all('li')]
+                if steps:
+                    instructions = '\n'.join(f"{i+1}. {s}" for i, s in enumerate(steps))
+                    break
+
+        # Tips
+        tips_section = None
+        for el in elements:
+            if el.name in ('h3', 'h4') and ('tip' in el.get_text().lower() or 'note' in el.get_text().lower()):
+                nxt = el.find_next_sibling()
+                if nxt and nxt.name not in ('h2', 'h3', 'h4'):
+                    text = nxt.get_text(strip=True)[:300]
+                    if len(text) > 20:
+                        tips_section = text
+                break
+
+        # Ingredients: collect from sub-headings (grain/hop/yeast/ingredient)
+        ingredients = []
+        seen_names = set()
+        idx = 0
+        in_ingredient_section = False
+
+        for el in elements:
+            if el.name in ('h3', 'h4'):
+                heading_text = el.get_text().lower()
+                in_ingredient_section = any(k in heading_text for k in (
+                    'ingredient', 'grain', 'malt', 'hop', 'yeast', 'fermentable', 'adjunct',
+                ))
+                continue
+            if in_ingredient_section and el.name in ('ul', 'ol'):
+                for li in el.find_all('li'):
+                    raw = li.get_text(separator=' ', strip=True)
+                    qty, unit, ing_name = parse_quantity(raw)
+                    if ing_name and ing_name.lower() not in seen_names and len(ing_name) > 1:
+                        seen_names.add(ing_name.lower())
+                        is_yeast = any(k in ing_name.lower() for k in ('yeast', 'wyeast', 'white labs', 'safale', 'lalvin', 'fermentis'))
+                        ingredients.append({
+                            'name': ing_name, 'quantity': qty, 'unit': unit,
+                            'notes': 'yeast' if is_yeast else None, 'order_index': idx,
+                        })
+                        idx += 1
+
+        # Fallback: any <ul> in the section if no ingredient sub-heading found
+        if not ingredients:
+            for el in elements:
+                if el.name == 'ul':
+                    for li in el.find_all('li'):
+                        raw = li.get_text(separator=' ', strip=True)
+                        qty, unit, ing_name = parse_quantity(raw)
+                        if ing_name and ing_name.lower() not in seen_names and len(ing_name) > 1:
+                            seen_names.add(ing_name.lower())
+                            is_yeast = any(k in ing_name.lower() for k in ('yeast', 'wyeast', 'white labs', 'safale', 'lalvin', 'fermentis'))
+                            ingredients.append({
+                                'name': ing_name, 'quantity': qty, 'unit': unit,
+                                'notes': 'yeast' if is_yeast else None, 'order_index': idx,
+                            })
+                            idx += 1
+                    if ingredients:
+                        break
+
+        if not ingredients:
+            print(f"  [SKIP SECTION] {name} — no ingredients parsed")
+            continue
+
+        recipes.append({
+            'name': name,
+            'fermentation_type': fermentation_type,
+            'description': description,
+            'difficulty': difficulty,
+            'batch_size_liters': batch_size,
+            'estimated_duration_days': duration,
+            'instructions': instructions,
+            'tips': tips_section,
+            'is_public': True,
+            'creator_id': None,
+            'ingredients': ingredients,
+        })
+
+    return recipes
+
+
 # ── Index scraper ─────────────────────────────────────────────────────────────
 
 def scrape_index() -> list[str]:
@@ -213,10 +358,10 @@ def scrape_index() -> list[str]:
 
 # ── Recipe page scraper ───────────────────────────────────────────────────────
 
-def scrape_recipe(url: str) -> dict | None:
+def scrape_recipe(url: str) -> list[dict] | None:
     """
-    Scrape a single recipe page. Returns a dict ready to insert, or None if
-    the page doesn't look like a recipe.
+    Scrape a recipe page. Returns a list of recipe dicts (multiple for listicle pages),
+    or None if the page doesn't look like a recipe.
     """
     try:
         soup = get(url)
@@ -230,6 +375,10 @@ def scrape_recipe(url: str) -> dict | None:
     if not re.search(r'\b(lbs?|oz|gallon|yeast|malt|hops?)\b', full_text, re.IGNORECASE):
         print(f"  [SKIP] {url} — doesn't look like a recipe")
         return None
+
+    if is_listicle(soup):
+        results = scrape_listicle(url, soup)
+        return results if results else None
 
     # ── Name ──
     h1 = soup.find('h1')
@@ -246,13 +395,32 @@ def scrape_recipe(url: str) -> dict | None:
     fermentation_type = infer_fermentation_type(name, full_text)
 
     # ── Instructions ──
-    # Grab ordered list items or paragraphs that look like steps
+    STEP_KEYWORDS = (
+        'mash', 'boil', 'ferment', 'pitch', 'cool', 'chill', 'transfer',
+        'condition', 'rack', 'sanitize', 'sparge', 'prime', 'bottle', 'keg',
+        'whirlpool', 'dry hop', 'hop stand', 'heat', 'steep', 'lauter',
+    )
     steps = []
     for ol in soup.select('ol'):
         items = [li.get_text(strip=True) for li in ol.find_all('li')]
         if items:
             steps.extend(items)
-            break  # take first ordered list only
+            break
+
+    if not steps:
+        # Fallback: collect step-heading sections (Mash, Boil, Ferment, etc.)
+        for heading in soup.find_all(['h2', 'h3', 'h4']):
+            htext = heading.get_text(strip=True)
+            if any(k in htext.lower() for k in STEP_KEYWORDS):
+                paras = []
+                sib = heading.find_next_sibling()
+                while sib and sib.name not in ('h2', 'h3', 'h4'):
+                    t = sib.get_text(strip=True)
+                    if t and len(t) > 10:
+                        paras.append(t)
+                    sib = sib.find_next_sibling()
+                if paras:
+                    steps.append(f"{htext}: {' '.join(paras)[:300]}")
 
     instructions = '\n'.join(f"{i+1}. {s}" for i, s in enumerate(steps)) if steps else None
 
@@ -261,8 +429,10 @@ def scrape_recipe(url: str) -> dict | None:
     for heading in soup.find_all(['h2', 'h3']):
         if 'tip' in heading.get_text().lower() or 'note' in heading.get_text().lower():
             nxt = heading.find_next_sibling()
-            if nxt:
-                tips_section = nxt.get_text(strip=True)[:300]
+            if nxt and nxt.name not in ('h2', 'h3', 'h4'):
+                text = nxt.get_text(strip=True)[:300]
+                if len(text) > 20:
+                    tips_section = text
             break
 
     # ── Ingredients ──
@@ -319,7 +489,7 @@ def scrape_recipe(url: str) -> dict | None:
         print(f"  [SKIP] {url} — no ingredients parsed")
         return None
 
-    return {
+    return [{
         'name': name,
         'fermentation_type': fermentation_type,
         'description': description,
@@ -331,45 +501,156 @@ def scrape_recipe(url: str) -> dict | None:
         'is_public': True,
         'creator_id': None,
         'ingredients': ingredients,
-    }
+    }]
 
 
 # ── Seeder ────────────────────────────────────────────────────────────────────
+
+def insert_recipes(db, recipes: list[dict]) -> tuple[int, int]:
+    """Insert a list of recipe dicts, skipping duplicates. Returns (added, skipped)."""
+    added = skipped = 0
+    for data in recipes:
+        existing = db.query(Recipe).filter(Recipe.name == data['name']).first()
+        if existing:
+            print(f"  [EXISTS] {data['name']}")
+            skipped += 1
+            continue
+
+        ingredients = data.pop('ingredients')
+        recipe = Recipe(**data)
+        db.add(recipe)
+        db.flush()
+
+        for ing in ingredients:
+            db.add(RecipeIngredient(recipe_id=recipe.id, **ing))
+
+        db.commit()
+        print(f"  [OK] {recipe.name} — {len(ingredients)} ingredients")
+        added += 1
+    return added, skipped
+
+
+def fix_listicle_url(url: str):
+    """Delete any existing recipe scraped from a listicle URL and re-scrape all sub-recipes."""
+    db = SessionLocal()
+    try:
+        soup = get(url)
+        bad_name = soup.find('h1').get_text(strip=True) if soup.find('h1') else None
+        if bad_name:
+            bad = db.query(Recipe).filter(Recipe.name == bad_name).first()
+            if bad:
+                db.query(RecipeIngredient).filter(RecipeIngredient.recipe_id == bad.id).delete()
+                db.delete(bad)
+                db.commit()
+                print(f"Deleted bad record: {bad_name}")
+
+        results = scrape_listicle(url, soup)
+        if not results:
+            print("No recipes parsed from listicle.")
+            return
+        added, skipped = insert_recipes(db, results)
+        print(f"\nDone — {added} added, {skipped} skipped.")
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
+
+def rescrape_instructions():
+    """Re-scrape instructions for all recipes that currently have none."""
+    db = SessionLocal()
+    try:
+        missing = db.query(Recipe).filter(Recipe.instructions == None).all()
+        missing_names = {r.name: r for r in missing}
+        print(f"Found {len(missing_names)} recipes missing instructions")
+
+        urls = scrape_index()
+        updated = skipped = 0
+
+        for url in urls:
+            try:
+                soup = get(url)
+            except Exception as e:
+                print(f"  [ERR] {url}: {e}")
+                time.sleep(0.3)
+                continue
+
+            h1 = soup.find('h1')
+            if not h1:
+                continue
+            page_name = h1.get_text(strip=True)
+
+            if page_name not in missing_names:
+                time.sleep(0.2)
+                continue
+
+            recipe = missing_names[page_name]
+            print(f"\nRe-scraping: {page_name}")
+
+            STEP_KEYWORDS = (
+                'mash', 'boil', 'ferment', 'pitch', 'cool', 'chill', 'transfer',
+                'condition', 'rack', 'sanitize', 'sparge', 'prime', 'bottle', 'keg',
+                'whirlpool', 'dry hop', 'hop stand', 'heat', 'steep', 'lauter',
+            )
+            steps = []
+            for ol in soup.select('ol'):
+                items = [li.get_text(strip=True) for li in ol.find_all('li')]
+                if items:
+                    steps.extend(items)
+                    break
+
+            if not steps:
+                for heading in soup.find_all(['h2', 'h3', 'h4']):
+                    htext = heading.get_text(strip=True)
+                    if any(k in htext.lower() for k in STEP_KEYWORDS):
+                        paras = []
+                        sib = heading.find_next_sibling()
+                        while sib and sib.name not in ('h2', 'h3', 'h4'):
+                            t = sib.get_text(strip=True)
+                            if t and len(t) > 10:
+                                paras.append(t)
+                            sib = sib.find_next_sibling()
+                        if paras:
+                            steps.append(f"{htext}: {' '.join(paras)[:300]}")
+
+            if steps:
+                recipe.instructions = '\n'.join(f"{i+1}. {s}" for i, s in enumerate(steps))
+                db.commit()
+                print(f"  [OK] {len(steps)} steps")
+                updated += 1
+            else:
+                print(f"  [SKIP] no instructions found on page")
+                skipped += 1
+
+            time.sleep(0.4)
+
+        print(f"\nDone — {updated} updated, {skipped} skipped (no instructions on page).")
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
 
 def seed():
     urls = scrape_index()
     db = SessionLocal()
 
-    added = skipped = failed = 0
+    added = skipped = 0
 
     try:
         for url in urls:
             print(f"\nScraping: {url}")
-            data = scrape_recipe(url)
-            if not data:
+            results = scrape_recipe(url)
+            if not results:
                 skipped += 1
                 time.sleep(0.3)
                 continue
 
-            # Skip if recipe with same name already exists
-            existing = db.query(Recipe).filter(Recipe.name == data['name']).first()
-            if existing:
-                print(f"  [EXISTS] {data['name']}")
-                skipped += 1
-                time.sleep(0.3)
-                continue
-
-            ingredients = data.pop('ingredients')
-            recipe = Recipe(**data)
-            db.add(recipe)
-            db.flush()
-
-            for ing in ingredients:
-                db.add(RecipeIngredient(recipe_id=recipe.id, **ing))
-
-            db.commit()
-            print(f"  [OK] {recipe.name} — {len(ingredients)} ingredients")
-            added += 1
+            a, s = insert_recipes(db, results)
+            added += a
+            skipped += s
             time.sleep(0.4)
 
     except Exception as e:
@@ -378,8 +659,13 @@ def seed():
     finally:
         db.close()
 
-    print(f"\nDone — {added} recipes added, {skipped} skipped, {failed} failed.")
+    print(f"\nDone — {added} recipes added, {skipped} skipped.")
 
 
 if __name__ == '__main__':
-    seed()
+    if len(sys.argv) == 3 and sys.argv[1] == '--fix-url':
+        fix_listicle_url(sys.argv[2])
+    elif len(sys.argv) == 2 and sys.argv[1] == '--fix-instructions':
+        rescrape_instructions()
+    else:
+        seed()

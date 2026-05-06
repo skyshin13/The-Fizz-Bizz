@@ -7,6 +7,8 @@ import styles from './CalculatorsPage.module.css'
 
 type Tab = 'abv' | 'priming'
 
+const toC = (f: number) => (f - 32) * 5 / 9
+
 export default function CalculatorsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('abv')
 
@@ -117,7 +119,7 @@ function PrimingSugarCalculator() {
     batch_size_liters: '19',
     current_gravity: '1.010',
     target_co2_volumes: '2.5',
-    fermentation_temp_celsius: '18',
+    fermentation_temp_celsius: '64',
     sugar_type: 'table_sugar',
   })
   const [result, setResult] = useState<{ sugar_grams: number; sugar_oz: number; sugar_type: string; notes: string } | null>(null)
@@ -133,7 +135,7 @@ function PrimingSugarCalculator() {
         batch_size_liters: parseFloat(form.batch_size_liters),
         current_gravity: parseFloat(form.current_gravity),
         target_co2_volumes: parseFloat(form.target_co2_volumes),
-        fermentation_temp_celsius: parseFloat(form.fermentation_temp_celsius),
+        fermentation_temp_celsius: toC(parseFloat(form.fermentation_temp_celsius)),
         sugar_type: form.sugar_type,
       })
       setResult(res.data)
@@ -167,8 +169,8 @@ function PrimingSugarCalculator() {
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>Beer: 2.4, Kombucha/soda: 3.0–3.5, Lager: 2.5</p>
           </div>
           <div>
-            <label style={lStyle}>Fermentation Temp (°C)</label>
-            <input type="number" step="0.5" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} style={iStyle} />
+            <label style={lStyle}>Fermentation Temp (°F)</label>
+            <input type="number" step="1" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} style={iStyle} />
           </div>
           <div>
             <label style={lStyle}>Sugar Type</label>

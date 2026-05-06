@@ -8,6 +8,8 @@ import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Dna, AlertTriangle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+
+const toC = (f: number) => (f - 32) * 5 / 9
 import styles from './ProjectsPage.module.css'
 
 export default function ProjectsPage() {
@@ -238,7 +240,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
         batch_size_liters: form.batch_size_liters ? parseFloat(form.batch_size_liters) : undefined,
         initial_gravity: form.initial_gravity ? parseFloat(form.initial_gravity) : undefined,
         initial_ph: form.initial_ph ? parseFloat(form.initial_ph) : undefined,
-        fermentation_temp_celsius: form.fermentation_temp_celsius ? parseFloat(form.fermentation_temp_celsius) : undefined,
+        fermentation_temp_celsius: form.fermentation_temp_celsius ? toC(parseFloat(form.fermentation_temp_celsius)) : undefined,
         target_end_date: form.target_end_date || undefined,
         notes: form.notes || undefined,
         yeast_id: isAlcohol && yeastId ? parseInt(yeastId) : undefined,
@@ -282,7 +284,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
 
             <Field label="Fermentation Type *">
               <select required value={form.fermentation_type} onChange={set('fermentation_type')} style={iStyle}>
-                {types.map(t => (
+                {types.filter(t => !['water_kefir', 'cider'].includes(t.value)).map(t => (
                   <option key={t.value} value={t.value}>
                     {t.emoji ? `${t.emoji} ${t.label}` : t.label}
                   </option>
@@ -324,8 +326,8 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
               <Field label="Initial pH">
                 <input type="number" step="0.1" min="0" max="14" value={form.initial_ph} onChange={set('initial_ph')} placeholder="7.2" style={iStyle} />
               </Field>
-              <Field label="Temp (°C)">
-                <input type="number" step="0.5" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} placeholder="20" style={iStyle} />
+              <Field label="Temp (°F)">
+                <input type="number" step="1" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} placeholder="68" style={iStyle} />
               </Field>
               <Field label="Target End Date">
                 <input type="date" value={form.target_end_date} onChange={set('target_end_date')} style={iStyle} />

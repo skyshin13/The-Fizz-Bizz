@@ -101,15 +101,39 @@ def get_live_cer(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    measurements = (
-        db.query(MeasurementLog)
-        .filter(
-            MeasurementLog.project_id == project_id,
-            MeasurementLog.co2_psi.isnot(None),
-        )
-        .order_by(MeasurementLog.logged_at)
-        .all()
+    MAX_CER_POINTS = 300
+    total_cer_count = (
+        db.query(MeasurementLog.id)
+        .filter(MeasurementLog.project_id == project_id, MeasurementLog.co2_psi.isnot(None))
+        .count()
     )
+    if total_cer_count <= MAX_CER_POINTS:
+        measurements = (
+            db.query(MeasurementLog)
+            .filter(MeasurementLog.project_id == project_id, MeasurementLog.co2_psi.isnot(None))
+            .order_by(MeasurementLog.logged_at)
+            .all()
+        )
+    else:
+        # Downsample: take every Nth row to keep ~MAX_CER_POINTS, always include the latest
+        step = total_cer_count // MAX_CER_POINTS
+        all_ids = [
+            row[0] for row in (
+                db.query(MeasurementLog.id)
+                .filter(MeasurementLog.project_id == project_id, MeasurementLog.co2_psi.isnot(None))
+                .order_by(MeasurementLog.logged_at)
+                .all()
+            )
+        ]
+        sampled_ids = [all_ids[i] for i in range(0, len(all_ids), step)]
+        if all_ids[-1] not in sampled_ids:
+            sampled_ids.append(all_ids[-1])
+        measurements = (
+            db.query(MeasurementLog)
+            .filter(MeasurementLog.id.in_(sampled_ids))
+            .order_by(MeasurementLog.logged_at)
+            .all()
+        )
 
     start = project.start_date
     if start and start.tzinfo is None:

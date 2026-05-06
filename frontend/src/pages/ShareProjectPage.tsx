@@ -6,6 +6,8 @@ import { FlaskConical, Droplets, Activity, Thermometer, Clock } from 'lucide-rea
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
 
+const toF = (c: number) => Math.round((c * 9 / 5 + 32) * 10) / 10
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 interface SharedMeasurement {
@@ -156,7 +158,7 @@ export default function ShareProjectPage() {
                 { label: 'Gravity (SG)', value: latestM.specific_gravity?.toFixed(3), icon: FlaskConical, color: 'var(--amber)' },
                 { label: 'Est. ABV', value: latestM.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined, icon: Activity, color: 'var(--rust)' },
               ] : []),
-              { label: 'Temp (°C)', value: latestM.temperature_celsius?.toFixed(1), icon: Thermometer, color: 'var(--slate)' },
+              { label: 'Temp (°F)', value: latestM.temperature_celsius != null ? String(toF(latestM.temperature_celsius)) : undefined, icon: Thermometer, color: 'var(--slate)' },
             ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
