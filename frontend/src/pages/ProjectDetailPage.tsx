@@ -151,6 +151,34 @@ export default function ProjectDetailPage() {
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No yeast strain set</span>
                 )}
               </div>
+              {/* Visibility toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginTop: '0.75rem' }}>
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.patch(`/projects/${project.id}`, { is_public: !project.is_public })
+                      await load()
+                      toast.success(project.is_public ? 'Project set to private' : 'Project is now public')
+                    } catch {
+                      toast.error('Failed to update visibility')
+                    }
+                  }}
+                  style={{ padding: '0.3rem 0.75rem', border: `1px solid ${project.is_public ? 'var(--border)' : 'var(--moss)'}`, borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: project.is_public ? 'var(--text-muted)' : 'var(--moss)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                >
+                  {project.is_public ? <><Lock size={11} /> Private</> : <><Globe size={11} /> Public</>}
+                </button>
+                {project.is_public && (
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/share/${project.id}`
+                      navigator.clipboard.writeText(url).then(() => toast.success('Share link copied!'))
+                    }}
+                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                  >
+                    <Share2 size={11} /> Copy Link
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className={styles.actionButtons}>
@@ -173,34 +201,6 @@ export default function ProjectDetailPage() {
               <button onClick={() => setShowReminder(true)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--amber)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--amber)', background: 'var(--card-bg)' }}>
                 <Bell size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Set Reminder
               </button>
-            </div>
-            {/* Row 3: Visibility toggle + Share link */}
-            <div style={{ display: 'flex', gap: '0.625rem' }}>
-              <button
-                onClick={async () => {
-                  try {
-                    await api.patch(`/projects/${project.id}`, { is_public: !project.is_public })
-                    await load()
-                    toast.success(project.is_public ? 'Project set to private' : 'Project is now public')
-                  } catch {
-                    toast.error('Failed to update visibility')
-                  }
-                }}
-                style={{ padding: '0.5rem 1rem', border: `1px solid ${project.is_public ? 'var(--border)' : 'var(--moss)'}`, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, color: project.is_public ? 'var(--text-secondary)' : 'var(--moss)', background: 'var(--card-bg)', display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                {project.is_public ? <><Lock size={14} /> Make Private</> : <><Globe size={14} /> Make Public</>}
-              </button>
-              {project.is_public && (
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}/share/${project.id}`
-                    navigator.clipboard.writeText(url).then(() => toast.success('Share link copied!'))
-                  }}
-                  style={{ padding: '0.5rem 1rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  <Share2 size={14} /> Copy Share Link
-                </button>
-              )}
             </div>
           </div>
         </div>
