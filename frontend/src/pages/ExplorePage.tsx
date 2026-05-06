@@ -4,7 +4,7 @@ import api from '../lib/api'
 import { PublicProject, PublicUser } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { Search, Users, FlaskConical, UserPlus, Check } from 'lucide-react'
+import { Search, Users, FlaskConical, UserPlus, UserCheck, Check } from 'lucide-react'
 import styles from './ExplorePage.module.css'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -184,9 +184,17 @@ export default function ExplorePage() {
                     >
                       View Profile
                     </button>
-                    {sentRequests.has(u.id) ? (
-                      <button disabled style={{ flex: 1, padding: '0.5rem', background: 'var(--moss-light)', color: '#fff', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        <Check size={13} /> Sent
+                    {u.friendship_status === 'accepted' || sentRequests.has(u.id) && u.friendship_status === 'accepted' ? (
+                      <button disabled style={{ flex: 1, padding: '0.5rem', background: 'var(--moss)', color: '#fff', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                        <UserCheck size={13} /> Friends
+                      </button>
+                    ) : u.friendship_status === 'pending' ? (
+                      <button disabled style={{ flex: 1, padding: '0.5rem', background: 'var(--parchment)', color: 'var(--text-muted)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: '1px solid var(--border)' }}>
+                        <Check size={13} /> Pending
+                      </button>
+                    ) : sentRequests.has(u.id) ? (
+                      <button disabled style={{ flex: 1, padding: '0.5rem', background: 'var(--parchment)', color: 'var(--text-muted)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: '1px solid var(--border)' }}>
+                        <Check size={13} /> Pending
                       </button>
                     ) : (
                       <button

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.db.database import get_db
-from app.models.models import FermentationProject, MeasurementLog, User
+from app.models.models import FermentationProject, MeasurementLog, User, Friendship
 from app.schemas.schemas import PublicProjectOut, PublicUserOut, SharedProjectOut, SharedMeasurementOut
 from app.api.deps import get_current_user
 
@@ -99,6 +99,14 @@ def search_users(
         )
     users = query.limit(30).all()
 
+    friendships = db.query(Friendship).filter(
+        (Friendship.requester_id == current_user.id) | (Friendship.receiver_id == current_user.id)
+    ).all()
+    friendship_map = {
+        (f.receiver_id if f.requester_id == current_user.id else f.requester_id): f.status
+        for f in friendships
+    }
+
     return [
         PublicUserOut(
             id=u.id,
@@ -113,6 +121,7 @@ def search_users(
                     FermentationProject.is_public == True,
                 )
                 .count(),
+            friendship_status=friendship_map.get(u.id),
         )
         for u in users
     ]

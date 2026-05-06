@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { PublicUserProfile, FriendRequest, PublicProject } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell } from 'lucide-react'
+import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell, Camera } from 'lucide-react'
 import styles from './ProfilePage.module.css'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -59,9 +60,7 @@ function OwnProfile() {
     <div className={styles.page}>
       {/* Header */}
       <div className={`fade-in ${styles.profileHeader}`}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '1.75rem', color: 'var(--brown-dark)', flexShrink: 0 }}>
-          {me?.display_name?.[0]?.toUpperCase() || me?.username?.[0]?.toUpperCase() || '?'}
-        </div>
+        <Avatar name={me?.display_name || me?.username || '?'} avatarUrl={me?.avatar_url} size={72} />
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.2rem' }}>{me?.display_name || me?.username}</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>@{me?.username}</p>
@@ -96,7 +95,7 @@ function OwnProfile() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             {pendingReceived.map(f => (
               <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Avatar name={f.friend.display_name || f.friend.username} size={32} />
+                <Avatar name={f.friend.display_name || f.friend.username} avatarUrl={f.friend.avatar_url} size={32} />
                 <div style={{ flex: 1 }}>
                   <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{f.friend.display_name || f.friend.username}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.775rem' }}> @{f.friend.username}</span>
@@ -143,7 +142,7 @@ function OwnProfile() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {pendingSent.map(f => (
               <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--card-bg)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <Avatar name={f.friend.display_name || f.friend.username} size={32} />
+                <Avatar name={f.friend.display_name || f.friend.username} avatarUrl={f.friend.avatar_url} size={32} />
                 <div style={{ flex: 1 }}>
                   <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{f.friend.display_name || f.friend.username}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.775rem' }}> @{f.friend.username}</span>
@@ -232,9 +231,7 @@ function OtherProfile({ username }: { username: string }) {
     <div className={styles.page}>
       {/* Profile header */}
       <div className={`fade-in ${styles.profileHeader}`}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '1.75rem', color: 'var(--brown-dark)', flexShrink: 0 }}>
-          {profile.display_name?.[0]?.toUpperCase() || profile.username[0].toUpperCase()}
-        </div>
+        <Avatar name={profile.display_name || profile.username} avatarUrl={profile.avatar_url} size={72} />
         <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.2rem' }}>{profile.display_name || profile.username}</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>@{profile.username}</p>
@@ -272,7 +269,10 @@ function OtherProfile({ username }: { username: string }) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+function Avatar({ name, avatarUrl, size = 40 }: { name: string; avatarUrl?: string | null; size?: number }) {
+  if (avatarUrl) {
+    return <img src={avatarUrl} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, display: 'block' }} />
+  }
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: size * 0.4, color: 'var(--brown-dark)', flexShrink: 0 }}>
       {name[0]?.toUpperCase()}
@@ -285,7 +285,7 @@ function FriendCard({ friendship, onRemove }: { friendship: FriendRequest; onRem
   const f = friendship.friend
   return (
     <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-      <Avatar name={f.display_name || f.username} size={40} />
+      <Avatar name={f.display_name || f.username} avatarUrl={f.avatar_url} size={40} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.display_name || f.username}</div>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{f.username}</div>
@@ -310,19 +310,43 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
     phone_number: me?.phone_number || '',
     sms_notifications_enabled: me?.sms_notifications_enabled ?? false,
   })
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string>(me?.avatar_url || '')
   const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
-      const res = await api.patch('/users/me', {
+      let avatar_url: string | null = me?.avatar_url ?? null
+
+      if (avatarFile) {
+        const ext = avatarFile.name.split('.').pop()
+        const path = `${me.id}/avatar.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(path, avatarFile, { upsert: true })
+        if (uploadError) throw new Error('Avatar upload failed')
+        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+        avatar_url = publicUrl
+      }
+
+      await api.patch('/users/me', {
         display_name: form.display_name || null,
         bio: form.bio || null,
         phone_number: form.phone_number || null,
         sms_notifications_enabled: form.sms_notifications_enabled,
+        avatar_url,
       })
       toast.success('Profile updated!')
       onSaved()
@@ -344,6 +368,28 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
         </div>
         <form onSubmit={submit}>
+          {/* Avatar upload */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <Avatar name={me?.display_name || me?.username || '?'} avatarUrl={avatarPreview || null} size={72} />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: '50%', background: 'var(--amber)', border: '2px solid var(--card-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}
+              >
+                <Camera size={12} color="var(--brown-dark)" />
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
+            </div>
+            <div>
+              <p style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Profile Photo</p>
+              <button type="button" onClick={() => fileInputRef.current?.click()} style={{ fontSize: '0.775rem', color: 'var(--amber)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                {avatarPreview ? 'Change photo' : 'Upload photo'}
+              </button>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>JPG, PNG, or GIF</p>
+            </div>
+          </div>
+
           <div style={{ marginBottom: '1rem' }}>
             <label style={lStyle}>Display Name</label>
             <input value={form.display_name} onChange={set('display_name')} placeholder={me?.username} style={iStyle} />

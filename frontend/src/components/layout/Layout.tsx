@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { usePendingRequests } from '../../hooks/usePendingRequests'
 import {
   LayoutDashboard, FlaskConical, BookOpen, Dna, Calculator, LogOut, Compass, UserCircle
 } from 'lucide-react'
@@ -18,6 +19,7 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const pendingCount = usePendingRequests()
 
   const handleLogout = () => {
     logout()
@@ -60,7 +62,12 @@ export default function Layout() {
                 `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
               }
             >
-              <Icon size={18} />
+              <span className={styles.iconWrap}>
+                <Icon size={18} />
+                {to === '/profile' && pendingCount > 0 && (
+                  <span className={styles.dot} />
+                )}
+              </span>
               <span>{label}</span>
             </NavLink>
           ))}
@@ -99,7 +106,12 @@ export default function Layout() {
               `${styles.bottomNavItem} ${isActive ? styles.bottomNavItemActive : ''}`
             }
           >
-            <Icon size={22} />
+            <span className={styles.iconWrap}>
+              <Icon size={22} />
+              {to === '/profile' && pendingCount > 0 && (
+                <span className={styles.countBadge}>{pendingCount > 9 ? '9+' : pendingCount}</span>
+              )}
+            </span>
           </NavLink>
         ))}
       </nav>

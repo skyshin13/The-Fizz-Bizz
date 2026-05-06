@@ -108,6 +108,7 @@ export interface PublicUser {
   avatar_url?: string
   created_at: string
   public_project_count: number
+  friendship_status?: 'pending' | 'accepted'
 }
 
 export interface PublicProject {

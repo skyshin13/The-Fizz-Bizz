@@ -69,6 +69,7 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     bio: Optional[str] = None
     sms_notifications_enabled: Optional[bool] = None
+    avatar_url: Optional[str] = None
 
 
 # ─── Measurement Schemas ─────────────────────────────────────────────────────
@@ -464,6 +465,7 @@ class PublicUserOut(BaseModel):
     avatar_url: Optional[str] = None
     created_at: datetime
     public_project_count: int = 0
+    friendship_status: Optional[str] = None
 
     class Config:
         from_attributes = True
