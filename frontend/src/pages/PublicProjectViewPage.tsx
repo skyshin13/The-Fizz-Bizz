@@ -45,6 +45,7 @@ interface PublicProjectDetail {
   initial_ph: number | null
   fermentation_temp_celsius: number | null
   start_date: string | null
+  end_date: string | null
   created_at: string
   author_username: string
   author_display_name: string | null
@@ -125,6 +126,18 @@ export default function PublicProjectViewPage() {
               </span>
               {daysSince != null && (
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Day {daysSince}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+              {project.start_date && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Started {format(parseISO(project.start_date), 'MMM d, yyyy')}
+                </span>
+              )}
+              {project.end_date && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  · Finished {format(parseISO(project.end_date), 'MMM d, yyyy')}
+                </span>
               )}
             </div>
           </div>
@@ -219,7 +232,7 @@ export default function PublicProjectViewPage() {
               <YAxis domain={[0, 14]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
               <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }}
                 formatter={(v: number) => [`${v} pH`, 'pH']}
-                labelFormatter={l => `${(Number(l) / 60).toFixed(1)}h elapsed`} />
+                labelFormatter={l => firstTs ? format(new Date(firstTs + Number(l) * 60 * 1000), 'MMM d, yyyy h:mm a') : ''} />
               <Line type="monotone" dataKey="ph" stroke="#4a6741" strokeWidth={2.5} dot={{ fill: '#4a6741', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>

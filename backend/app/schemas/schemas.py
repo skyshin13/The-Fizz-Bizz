@@ -547,6 +547,7 @@ class PublicProjectDetailOut(BaseModel):
     initial_ph: Optional[float] = None
     fermentation_temp_celsius: Optional[float] = None
     start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
     created_at: datetime
     author_username: str
     author_display_name: Optional[str] = None

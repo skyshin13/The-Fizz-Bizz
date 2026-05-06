@@ -145,6 +145,23 @@ export default function ProjectDetailPage() {
                 <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.625rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px' }}>{project.status}</span>
                 {daysSince != null && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Day {daysSince}</span>}
               </div>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.375rem' }}>
+                {project.start_date && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Started {format(parseISO(project.start_date), 'MMM d, yyyy')}
+                  </span>
+                )}
+                {project.end_date && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    · Finished {format(parseISO(project.end_date), 'MMM d, yyyy')}
+                  </span>
+                )}
+                {!project.end_date && project.target_end_date && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    · Target {format(parseISO(project.target_end_date), 'MMM d, yyyy')}
+                  </span>
+                )}
+              </div>
               {/* Yeast strain display */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.375rem' }}>
                 <FlaskConical size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -460,7 +477,7 @@ export default function ProjectDetailPage() {
                   activeChart === 'ph' ? [`${value} pH`, 'pH'] :
                   [value.toFixed(3), 'Specific Gravity']
                 }
-                labelFormatter={(label) => `${(label / 60).toFixed(1)} hours elapsed`}
+                labelFormatter={(label) => firstTs ? format(new Date(firstTs + label * 60 * 1000), 'MMM d, yyyy h:mm a') : ''}
               />
               {activeChart === 'ph' && (
                 <Line type="monotone" dataKey="ph" name="pH" stroke="#4a6741" strokeWidth={2.5}

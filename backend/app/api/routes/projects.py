@@ -336,6 +336,7 @@ def get_public_project(
         initial_ph=project.initial_ph,
         fermentation_temp_celsius=project.fermentation_temp_celsius,
         start_date=project.start_date,
+        end_date=project.end_date,
         created_at=project.created_at,
         author_username=project.owner.username,
         author_display_name=project.owner.display_name,
