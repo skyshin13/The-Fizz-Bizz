@@ -36,11 +36,18 @@ export default function ProjectsPage() {
     if (filterVisibility === 'public' && !p.is_public) return false
     if (filterVisibility === 'private' && p.is_public) return false
     if (search) {
-      const q = search.toLowerCase()
-      const matches = p.name.toLowerCase().includes(q)
-        || (p.description?.toLowerCase().includes(q) ?? false)
-        || (p.notes?.toLowerCase().includes(q) ?? false)
-      if (!matches) return false
+      const blob = [
+        p.name,
+        p.description,
+        p.notes,
+        p.fermentation_type.replace(/_/g, ' '),
+        p.vessel_type,
+        p.yeast_strain?.name,
+        p.yeast_strain?.brand,
+        ...p.observations.map(o => o.content),
+      ].filter(Boolean).join(' ').toLowerCase()
+      const tokens = search.toLowerCase().trim().split(/\s+/)
+      if (!tokens.every(t => blob.includes(t))) return false
     }
     return true
   })
