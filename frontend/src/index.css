@@ -1,26 +1,43 @@
 :root {
-  --cream: #f5f0e8;
-  --parchment: #ede5d0;
-  --warm-white: #faf8f3;
-  --brown-dark: #2c1f14;
-  --brown-mid: #5c3d2e;
-  --brown-light: #8b6552;
-  --amber: #c8832a;
-  --amber-light: #e8a84a;
-  --amber-glow: #f5c76e;
-  --moss: #4a6741;
-  --moss-light: #7a9e74;
-  --rust: #b54a2c;
-  --slate: #3d4e5c;
-  --text-primary: #1e140a;
-  --text-secondary: #6b4f3a;
-  --text-muted: #9b8070;
-  --border: #d5c5b0;
-  --border-light: #e8dece;
-  --card-bg: #fdfaf5;
-  --shadow-sm: 0 1px 3px rgba(44, 31, 20, 0.08);
-  --shadow-md: 0 4px 12px rgba(44, 31, 20, 0.12);
-  --shadow-lg: 0 8px 24px rgba(44, 31, 20, 0.16);
+  /* Neutrals — Row 1 (#EDE4E0 family) */
+  --cream: #EDE4E0;
+  --parchment: #E2D6D0;
+  --warm-white: #F5F0EE;
+
+  /* Browns — Row 3 & 4 (#9F8772 / #665A48 families) */
+  --brown-dark: #2A2018;
+  --brown-mid: #665A48;
+  --brown-light: #9F8772;
+
+  /* Primary accent — terracotta/salmon, Row 1 dark */
+  --amber: #C07868;
+  --amber-light: #D4A090;
+  --amber-glow: #EDE4E0;
+
+  /* Green — Row 2 (#C8DBBE family) */
+  --moss: #4E7A4A;
+  --moss-light: #8AB886;
+
+  /* Functional */
+  --rust: #A85848;
+  --slate: #7A6A58;
+
+  /* Text */
+  --text-primary: #2A2018;
+  --text-secondary: #665A48;
+  --text-muted: #9F8772;
+
+  /* Borders */
+  --border: #CEC5BE;
+  --border-light: #E2D6D0;
+
+  /* Cards */
+  --card-bg: #FDFAF8;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(42, 32, 24, 0.08);
+  --shadow-md: 0 4px 12px rgba(42, 32, 24, 0.12);
+  --shadow-lg: 0 8px 24px rgba(42, 32, 24, 0.16);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
