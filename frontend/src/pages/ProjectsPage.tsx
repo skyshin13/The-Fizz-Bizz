@@ -17,6 +17,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterVisibility, setFilterVisibility] = useState<string>('all')
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -27,6 +28,8 @@ export default function ProjectsPage() {
 
   const filtered = projects.filter(p => {
     if (filterStatus !== 'all' && p.status !== filterStatus) return false
+    if (filterVisibility === 'public' && !p.is_public) return false
+    if (filterVisibility === 'private' && p.is_public) return false
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -51,7 +54,7 @@ export default function ProjectsPage() {
       <div className={`fade-in ${styles.header}`}>
         <div>
           <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Fermentation Projects</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{projects.length} total projects</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{filtered.length} of {projects.length} projects</p>
         </div>
         <button onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '10px', fontWeight: 600, fontSize: '0.875rem' }}>
           <Plus size={16} /> New Project
@@ -66,8 +69,19 @@ export default function ProjectsPage() {
         </div>
         <div className={styles.filterButtons}>
           {['all', 'active', 'completed'].map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, background: filterStatus === s ? 'var(--amber)' : 'var(--card-bg)', color: filterStatus === s ? 'var(--brown-dark)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+            <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, background: filterStatus === s ? 'var(--amber)' : 'var(--card-bg)', color: filterStatus === s ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
               {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className={styles.filterButtons}>
+          {[
+            { value: 'all', label: 'All' },
+            { value: 'public', label: '🌐 Public' },
+            { value: 'private', label: '🔒 Private' },
+          ].map(({ value, label }) => (
+            <button key={value} onClick={() => setFilterVisibility(value)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, background: filterVisibility === value ? 'var(--moss)' : 'var(--card-bg)', color: filterVisibility === value ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+              {label}
             </button>
           ))}
         </div>
