@@ -1169,12 +1169,11 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const isAlerting    = (liveState?.current_cer_estimate ?? 0) > alertNum
   const secsSincePoll = lastUpdated ? Math.round((Date.now() - lastUpdated.getTime()) / 1000) : null
 
-  // Zoom: slice points and compute X-axis domain for the selected window
+  // Zoom: slice points to the selected window
   const maxH = points.length > 0 ? points[points.length - 1].hours_elapsed : 0
   const windowH = viewHours === 'all' ? null : (viewHours === -1 ? (parseFloat(customHours) || 12) : viewHours)
   const minH    = windowH !== null ? Math.max(0, maxH - windowH) : 0
   const visiblePoints = windowH !== null ? points.filter(p => p.hours_elapsed >= minH) : points
-  const xDomain: [number | string, number | string] = windowH !== null ? [minH, maxH] : ['dataMin', 'dataMax']
 
   // Merge live points and simulated curve into a single dataset for the chart
   const mergedChartData = useMemo(() => {
@@ -1191,6 +1190,9 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
     }
     return Array.from(map.values()).sort((a, b) => a.hours_elapsed - b.hours_elapsed)
   }, [visiblePoints, simCurve, windowH, minH])
+
+  // X-axis offset: subtract first visible point so labels always start near 0 when zoomed
+  const xOffset = windowH !== null && mergedChartData.length > 0 ? mergedChartData[0].hours_elapsed : 0
 
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
@@ -1411,12 +1413,11 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                 <XAxis
                   dataKey="hours_elapsed"
                   type="number"
-                  domain={xDomain}
+                  domain={['dataMin', 'dataMax']}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
                   label={{ value: windowH !== null ? `Last ${windowH.toFixed(0)}h` : 'Hours since start', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
                   tickCount={8}
-                  tickFormatter={(v: number) => windowH !== null ? `+${(v - minH).toFixed(0)}h` : `${v.toFixed(0)}h`}
-                  allowDataOverflow
+                  tickFormatter={(v: number) => `${(v - xOffset).toFixed(0)}h`}
                 />
                 <YAxis
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
