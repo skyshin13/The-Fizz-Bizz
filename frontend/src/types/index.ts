@@ -93,6 +93,7 @@ export interface Project {
   vessel_type?: string
   notes?: string
   cover_photo_url?: string
+  sugar_amount_grams?: number
   is_public: boolean
   created_at: string
   measurements: Measurement[]

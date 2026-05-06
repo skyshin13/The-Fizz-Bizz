@@ -80,6 +80,7 @@ class FermentationProject(Base):
     vessel_type = Column(String)     # e.g. "mason jar", "carboy", "bucket"
     notes = Column(Text)
     cover_photo_url = Column(String)
+    sugar_amount_grams = Column(Float)
     is_public = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

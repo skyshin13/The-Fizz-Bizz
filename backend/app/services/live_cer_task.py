@@ -51,6 +51,8 @@ def _resolve_strain(project, db) -> str:
 
 
 def _estimate_sugar_g(project) -> float:
+    if getattr(project, 'sugar_amount_grams', None):
+        return float(project.sugar_amount_grams)
     og    = project.initial_gravity or 1.050
     vol_l = project.batch_size_liters or 19.0
     return max(50.0, (og - 1.0) * 2500 * vol_l)

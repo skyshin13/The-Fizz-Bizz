@@ -173,6 +173,7 @@ class ProjectCreate(BaseModel):
     vessel_type: Optional[str] = None
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None
+    sugar_amount_grams: Optional[float] = None
     is_public: bool = False
     yeast_id: Optional[int] = None
 
@@ -185,6 +186,8 @@ class ProjectUpdate(BaseModel):
     end_date: Optional[datetime] = None
     notes: Optional[str] = None
     is_public: Optional[bool] = None
+    cover_photo_url: Optional[str] = None
+    sugar_amount_grams: Optional[float] = None
 
 
 class ProjectOut(BaseModel):
@@ -205,6 +208,7 @@ class ProjectOut(BaseModel):
     vessel_type: Optional[str] = None
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None
+    sugar_amount_grams: Optional[float] = None
     is_public: bool = False
     created_at: datetime
     measurements: List[MeasurementOut] = []

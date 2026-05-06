@@ -412,12 +412,13 @@ export default function ProjectDetailPage() {
             </button>
           </div>
         )}
-        {(project.batch_size_liters || project.vessel_type || project.fermentation_temp_celsius || project.yeast_strain) && (
+        {(project.batch_size_liters || project.vessel_type || project.fermentation_temp_celsius || project.yeast_strain || project.sugar_amount_grams) && (
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
             {project.batch_size_liters && <Detail label="Batch Size" value={`${project.batch_size_liters}L`} />}
             {project.vessel_type && <Detail label="Vessel" value={project.vessel_type} />}
             {isAlcohol && project.initial_gravity && <Detail label="OG" value={project.initial_gravity.toFixed(3)} />}
             {project.fermentation_temp_celsius && <Detail label="Temp" value={`${toF(project.fermentation_temp_celsius)}°F`} />}
+            {project.sugar_amount_grams && <Detail label="Sugar Added" value={`${project.sugar_amount_grams}g`} />}
             {project.yeast_strain && (
               <Detail
                 label="Yeast Strain"
@@ -640,6 +641,7 @@ export default function ProjectDetailPage() {
               initialGravity={project.initial_gravity}
               batchSizeLiters={project.batch_size_liters}
               fermentationTempCelsius={project.fermentation_temp_celsius}
+              sugarAmountGrams={project.sugar_amount_grams}
             />
           </div>
         )}
@@ -974,12 +976,13 @@ const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59
 const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
 const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
 
-function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius }: {
+function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams }: {
   projectId: number
   startDate?: string
   initialGravity?: number
   batchSizeLiters?: number
   fermentationTempCelsius?: number
+  sugarAmountGrams?: number
 }) {
   const [strains, setStrains]           = useState<CERStrain[]>([])
   const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
@@ -990,7 +993,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   // Derive initial param defaults from project creation data — same formula as backend _create_initial_state
   const _vol   = batchSizeLiters ?? 19.0
   const _og    = initialGravity  ?? 1.050
-  const _sugar = Math.max(50, (_og - 1.0) * 2500 * _vol)
+  const _sugar = sugarAmountGrams ?? Math.max(50, (_og - 1.0) * 2500 * _vol)
   const _tempF = toF(fermentationTempCelsius ?? 20.0)
 
   // Editable params (initialised from project data; overridden by backend state on first load)
@@ -1384,9 +1387,9 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                   type="number"
                   domain={xDomain}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
-                  label={{ value: windowH !== null ? `Last ${windowH.toFixed(0)}h` : 'Hours elapsed', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
+                  label={{ value: windowH !== null ? `Last ${windowH.toFixed(0)}h` : 'Hours since start', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
                   tickCount={8}
-                  tickFormatter={(v: number) => `${v.toFixed(0)}h`}
+                  tickFormatter={(v: number) => windowH !== null ? `+${(v - minH).toFixed(0)}h` : `${v.toFixed(0)}h`}
                   allowDataOverflow
                 />
                 <YAxis

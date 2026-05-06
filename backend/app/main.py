@@ -19,6 +19,10 @@ def _run_migrations():
             ALTER TABLE project_cer_states
             ADD COLUMN IF NOT EXISTS interval_seconds INTEGER NOT NULL DEFAULT 30
         """))
+        try:
+            conn.execute(text("ALTER TABLE fermentation_projects ADD COLUMN sugar_amount_grams REAL"))
+        except Exception:
+            pass
         conn.commit()
 
 

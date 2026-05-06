@@ -237,6 +237,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
     name: '', fermentation_type: 'kombucha' as FermentationType,
     description: '', batch_size_liters: '', initial_gravity: '', initial_ph: '',
     fermentation_temp_celsius: '', vessel_type: '', target_end_date: '', notes: '',
+    sugar_amount_grams: '',
     is_public: false,
   })
   const [yeastId, setYeastId] = useState<string>('')
@@ -298,6 +299,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
         fermentation_temp_celsius: form.fermentation_temp_celsius ? toC(parseFloat(form.fermentation_temp_celsius)) : undefined,
         target_end_date: form.target_end_date || undefined,
         notes: form.notes || undefined,
+        sugar_amount_grams: form.sugar_amount_grams ? parseFloat(form.sugar_amount_grams) : undefined,
         yeast_id: isAlcohol && yeastId ? parseInt(yeastId) : undefined,
       })
       toast.success('Project created! 🫧')
@@ -354,6 +356,9 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Field label="Batch Size (L)">
                 <input type="number" step="0.1" min="0" value={form.batch_size_liters} onChange={set('batch_size_liters')} placeholder="3.8" style={iStyle} />
+              </Field>
+              <Field label="Sugar Added (g)">
+                <input type="number" step="1" min="0" value={form.sugar_amount_grams} onChange={set('sugar_amount_grams')} placeholder="200" style={iStyle} />
               </Field>
               <Field label="Vessel Type">
                 <input value={form.vessel_type} onChange={set('vessel_type')} placeholder="Mason jar, Carboy..." style={iStyle} />
