@@ -153,20 +153,26 @@ export default function ProjectDetailPage() {
               </div>
               {/* Visibility toggle */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginTop: '0.75rem' }}>
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.patch(`/projects/${project.id}`, { is_public: !project.is_public })
-                      await load()
-                      toast.success(project.is_public ? 'Project set to private' : 'Project is now public')
-                    } catch {
-                      toast.error('Failed to update visibility')
-                    }
-                  }}
-                  style={{ padding: '0.3rem 0.75rem', border: `1px solid ${project.is_public ? 'var(--border)' : 'var(--moss)'}`, borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: project.is_public ? 'var(--text-muted)' : 'var(--moss)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
-                >
-                  {project.is_public ? <><Lock size={11} /> Private</> : <><Globe size={11} /> Public</>}
-                </button>
+                {project.is_public ? (
+                  <span style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--moss)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Globe size={11} /> Public
+                  </span>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.patch(`/projects/${project.id}`, { is_public: true })
+                        await load()
+                        toast.success('Project is now public')
+                      } catch {
+                        toast.error('Failed to update visibility')
+                      }
+                    }}
+                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--moss)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--moss)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                  >
+                    <Globe size={11} /> Make Public
+                  </button>
+                )}
                 {project.is_public && (
                   <button
                     onClick={() => {
