@@ -34,10 +34,35 @@ export default function ProjectDetailPage() {
   const [yeastOptions, setYeastOptions] = useState<{ id: number; name: string; strain_code?: string; brand?: string; yeast_type?: string }[]>([])
   const [yeastDropdown, setYeastDropdown] = useState(false)
   const [descSelectedYeast, setDescSelectedYeast] = useState<{ id: number; name: string; strain_code?: string; brand?: string } | null | undefined>(undefined)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const { user } = useAuth()
   const { getEmoji } = useFermentationTypes()
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
   const loadReminders = () => api.get(`/projects/${id}/reminders`).then(r => setReminders(r.data)).catch(() => {})
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user || !project) return
+    setUploadingCover(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `${user.id}/cover-${project.id}-${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('project-photos').upload(path, file, { upsert: true })
+      if (uploadError) { toast.error('Upload failed'); return }
+      const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(path)
+      await api.patch(`/projects/${project.id}`, { cover_photo_url: urlData.publicUrl } as any)
+      await load()
+      toast.success('Cover photo updated')
+    } catch {
+      toast.error('Failed to update cover photo')
+    } finally {
+      setUploadingCover(false)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+    }
+  }
+
   useEffect(() => {
     load(); loadReminders()
     const interval = setInterval(load, 30000)
@@ -90,7 +115,29 @@ export default function ProjectDetailPage() {
         </Link>
         <div className={styles.headerRow}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ fontSize: '3rem' }}>{getEmoji(project.fermentation_type)}</span>
+            <div
+              onClick={() => coverInputRef.current?.click()}
+              title={project.cover_photo_url ? 'Change cover photo' : 'Add cover photo'}
+              style={{ position: 'relative', width: 72, height: 72, borderRadius: '14px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', background: 'var(--parchment)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {project.cover_photo_url
+                ? <img src={project.cover_photo_url} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: '2.5rem' }}>{getEmoji(project.fermentation_type)}</span>
+              }
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.35)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0)')}>
+                <Camera size={18} color="#fff" style={{ opacity: 0, transition: 'opacity 0.2s' }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                />
+              </div>
+              {uploadingCover && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="spinner" />
+                </div>
+              )}
+            </div>
+            <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
             <div>
               {editingName ? (
                 <form
