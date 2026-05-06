@@ -28,8 +28,8 @@
   position: absolute;
   bottom: 0;
   border-radius: 50%;
-  background: rgba(192, 120, 104, 0.15);
-  border: 1px solid rgba(192, 120, 104, 0.25);
+  background: rgba(196, 112, 90, 0.15);
+  border: 1px solid rgba(196, 112, 90, 0.25);
   animation: bubbleFloat 3s ease-in-out infinite;
 }
 
@@ -81,12 +81,12 @@
 }
 
 .navItem:hover {
-  background: rgba(192, 120, 104, 0.12);
+  background: rgba(196, 112, 90, 0.12);
   color: var(--amber-light);
 }
 
 .navItemActive {
-  background: rgba(192, 120, 104, 0.22);
+  background: rgba(196, 112, 90, 0.22);
   color: var(--amber-glow) !important;
   font-weight: 500;
 }
