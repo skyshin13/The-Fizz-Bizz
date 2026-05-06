@@ -12,6 +12,7 @@ import CalculatorsPage from './pages/CalculatorsPage'
 import ExplorePage from './pages/ExplorePage'
 import ProfilePage from './pages/ProfilePage'
 import ShareProjectPage from './pages/ShareProjectPage'
+import PublicProjectViewPage from './pages/PublicProjectViewPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="explore" element={<ExplorePage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="profile/:username" element={<ProfilePage />} />
+        <Route path="projects/:id/view" element={<PublicProjectViewPage />} />
       </Route>
     </Routes>
   )

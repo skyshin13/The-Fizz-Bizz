@@ -441,7 +441,7 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
 
 function PublicProjectMiniCard({ project, getEmoji }: { project: PublicProject; getEmoji: (t: string) => string }) {
   return (
-    <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+    <Link to={`/projects/${project.id}/view`} style={{ display: 'block', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', textDecoration: 'none', color: 'inherit' }}>
       {project.cover_photo_url ? (
         <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }} />
       ) : (
@@ -461,6 +461,6 @@ function PublicProjectMiniCard({ project, getEmoji }: { project: PublicProject; 
           </span>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }

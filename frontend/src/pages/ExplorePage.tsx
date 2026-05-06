@@ -217,7 +217,7 @@ export default function ExplorePage() {
 
 function PublicProjectCard({ project, getEmoji }: { project: PublicProject; getEmoji: (type: string) => string }) {
   return (
-    <Link to={`/profile/${project.author_username}`} style={{ display: 'block', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', transition: 'box-shadow 0.2s' }}>
+    <Link to={`/projects/${project.id}/view`} style={{ display: 'block', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', transition: 'box-shadow 0.2s' }}>
       {project.cover_photo_url ? (
         <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }} />
       ) : (

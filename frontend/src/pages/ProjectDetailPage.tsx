@@ -154,9 +154,21 @@ export default function ProjectDetailPage() {
               {/* Visibility toggle */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginTop: '0.75rem' }}>
                 {project.is_public ? (
-                  <span style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--moss)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.patch(`/projects/${project.id}`, { is_public: false })
+                        await load()
+                        toast.success('Project set to private')
+                      } catch {
+                        toast.error('Failed to update visibility')
+                      }
+                    }}
+                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--moss)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--moss)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                    title="Click to make private"
+                  >
                     <Globe size={11} /> Public
-                  </span>
+                  </button>
                 ) : (
                   <button
                     onClick={async () => {
@@ -168,9 +180,9 @@ export default function ProjectDetailPage() {
                         toast.error('Failed to update visibility')
                       }
                     }}
-                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--moss)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--moss)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
                   >
-                    <Globe size={11} /> Make Public
+                    <Lock size={11} /> Make Public
                   </button>
                 )}
                 {project.is_public && (

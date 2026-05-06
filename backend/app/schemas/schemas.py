@@ -500,6 +500,22 @@ class SharedMeasurementOut(BaseModel):
         from_attributes = True
 
 
+class SharedObservationOut(BaseModel):
+    content: str
+    photo_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SharedYeastOut(BaseModel):
+    name: str
+    strain_code: Optional[str] = None
+    brand: Optional[str] = None
+    yeast_type: Optional[str] = None
+
+
 class SharedProjectOut(BaseModel):
     id: int
     name: str
@@ -512,6 +528,32 @@ class SharedProjectOut(BaseModel):
     author_username: str
     author_display_name: Optional[str] = None
     measurements: List[SharedMeasurementOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+class PublicProjectDetailOut(BaseModel):
+    id: int
+    name: str
+    fermentation_type: FermentationType
+    status: ProjectStatus
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    cover_photo_url: Optional[str] = None
+    batch_size_liters: Optional[float] = None
+    vessel_type: Optional[str] = None
+    initial_gravity: Optional[float] = None
+    initial_ph: Optional[float] = None
+    fermentation_temp_celsius: Optional[float] = None
+    start_date: Optional[datetime] = None
+    created_at: datetime
+    author_username: str
+    author_display_name: Optional[str] = None
+    author_avatar_url: Optional[str] = None
+    measurements: List[SharedMeasurementOut] = []
+    observations: List[SharedObservationOut] = []
+    yeast_strain: Optional[SharedYeastOut] = None
 
     class Config:
         from_attributes = True

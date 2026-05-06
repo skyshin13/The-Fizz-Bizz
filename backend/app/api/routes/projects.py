@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.database import get_db
@@ -7,9 +8,20 @@ from app.schemas.schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
     MeasurementCreate, MeasurementOut,
     ObservationCreate, ObservationOut,
+    PublicProjectDetailOut, SharedMeasurementOut, SharedObservationOut, SharedYeastOut,
 )
 from app.api.deps import get_current_user
 from app.services.calculations import calculate_abv
+
+# Auto-generated CER background rows have only co2_psi+temperature set.
+# This filter selects only user-meaningful measurements (manually entered).
+_USER_MEAS_FILTER = or_(
+    MeasurementLog.ph.isnot(None),
+    MeasurementLog.specific_gravity.isnot(None),
+    MeasurementLog.alcohol_by_volume.isnot(None),
+    MeasurementLog.brix.isnot(None),
+    MeasurementLog.notes.isnot(None),
+)
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -66,14 +78,24 @@ def _attach_yeast_strains_batch(projects, db):
 def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     projects = (
         db.query(FermentationProject)
-        .options(
-            joinedload(FermentationProject.measurements),
-            joinedload(FermentationProject.observations),
-        )
+        .options(joinedload(FermentationProject.observations))
         .filter(FermentationProject.user_id == current_user.id)
         .order_by(FermentationProject.created_at.desc())
         .all()
     )
+    if projects:
+        project_ids = [p.id for p in projects]
+        user_measurements = (
+            db.query(MeasurementLog)
+            .filter(MeasurementLog.project_id.in_(project_ids), _USER_MEAS_FILTER)
+            .order_by(MeasurementLog.logged_at)
+            .all()
+        )
+        meas_by_project: dict[int, list] = {}
+        for m in user_measurements:
+            meas_by_project.setdefault(m.project_id, []).append(m)
+        for p in projects:
+            p.__dict__['measurements'] = meas_by_project.get(p.id, [])
     _attach_yeast_strains_batch(projects, db)
     return projects
 
@@ -106,12 +128,19 @@ def get_project(
 ):
     project = (
         db.query(FermentationProject)
-        .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.observations))
+        .options(joinedload(FermentationProject.observations))
         .filter(FermentationProject.id == project_id, FermentationProject.user_id == current_user.id)
         .first()
     )
     if not project:
         raise HTTPException(404, "Project not found")
+    user_measurements = (
+        db.query(MeasurementLog)
+        .filter(MeasurementLog.project_id == project_id, _USER_MEAS_FILTER)
+        .order_by(MeasurementLog.logged_at)
+        .all()
+    )
+    project.__dict__['measurements'] = user_measurements
     _attach_yeast_strain(project, db)
     return project
 
@@ -251,3 +280,74 @@ def add_observation(
     db.commit()
     db.refresh(obs)
     return obs
+
+
+@router.get("/{project_id}/public", response_model=PublicProjectDetailOut)
+def get_public_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = (
+        db.query(FermentationProject)
+        .options(
+            joinedload(FermentationProject.owner),
+            joinedload(FermentationProject.observations),
+            joinedload(FermentationProject.measurements),
+        )
+        .filter(
+            FermentationProject.id == project_id,
+            FermentationProject.is_public == True,
+        )
+        .first()
+    )
+    if not project:
+        raise HTTPException(404, "Project not found or is not public")
+
+    conn = db.query(ProjectYeastConnection).filter_by(project_id=project_id).first()
+    yeast_strain = None
+    if conn:
+        yeast = db.query(YeastProfile).filter_by(id=conn.yeast_id).first()
+        if yeast:
+            yeast_strain = SharedYeastOut(
+                name=yeast.name,
+                strain_code=yeast.strain_code,
+                brand=yeast.brand,
+                yeast_type=yeast.yeast_type,
+            )
+
+    user_measurements = [
+        m for m in project.measurements
+        if any([m.ph, m.specific_gravity, m.alcohol_by_volume, m.brix, m.notes])
+    ]
+    user_measurements.sort(key=lambda m: m.logged_at)
+
+    return PublicProjectDetailOut(
+        id=project.id,
+        name=project.name,
+        fermentation_type=project.fermentation_type,
+        status=project.status,
+        description=project.description,
+        notes=project.notes,
+        cover_photo_url=project.cover_photo_url,
+        batch_size_liters=project.batch_size_liters,
+        vessel_type=project.vessel_type,
+        initial_gravity=project.initial_gravity,
+        initial_ph=project.initial_ph,
+        fermentation_temp_celsius=project.fermentation_temp_celsius,
+        start_date=project.start_date,
+        created_at=project.created_at,
+        author_username=project.owner.username,
+        author_display_name=project.owner.display_name,
+        author_avatar_url=project.owner.avatar_url,
+        measurements=[SharedMeasurementOut.model_validate(m) for m in user_measurements],
+        observations=[
+            SharedObservationOut(
+                content=o.content,
+                photo_url=o.photo_url,
+                created_at=o.created_at,
+            )
+            for o in sorted(project.observations, key=lambda o: o.created_at)
+        ],
+        yeast_strain=yeast_strain,
+    )
