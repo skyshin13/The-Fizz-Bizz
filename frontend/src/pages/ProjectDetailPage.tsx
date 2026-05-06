@@ -57,7 +57,8 @@ export default function ProjectDetailPage() {
   const firstTs = sortedMeasurements.length > 0 ? new Date(sortedMeasurements[0].logged_at).getTime() : 0
   const chartData = sortedMeasurements.map(m => ({
     date: format(parseISO(m.logged_at), 'MMM d'),
-    minutesElapsed: Math.round((new Date(m.logged_at).getTime() - firstTs) / 60000),
+    minutesElapsed: (new Date(m.logged_at).getTime() - firstTs) / 60000,
+    ts: new Date(m.logged_at).getTime(),
     ph: m.ph ?? null,
     sg: m.specific_gravity ?? null,
     abv: m.alcohol_by_volume ?? null,
@@ -477,7 +478,10 @@ export default function ProjectDetailPage() {
                   activeChart === 'ph' ? [`${value} pH`, 'pH'] :
                   [value.toFixed(3), 'Specific Gravity']
                 }
-                labelFormatter={(label) => firstTs ? format(new Date(firstTs + label * 60 * 1000), 'MMM d, yyyy h:mm a') : ''}
+                labelFormatter={(_label, payload) => {
+                  const ts = (payload as any)?.[0]?.payload?.ts
+                  return ts ? format(new Date(ts), 'MMM d, yyyy h:mm a') : ''
+                }}
               />
               {activeChart === 'ph' && (
                 <Line type="monotone" dataKey="ph" name="pH" stroke="#4a6741" strokeWidth={2.5}

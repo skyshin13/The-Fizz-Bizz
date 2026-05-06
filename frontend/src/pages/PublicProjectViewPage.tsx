@@ -81,7 +81,8 @@ export default function PublicProjectViewPage() {
   )
   const firstTs = sortedMeasurements.length > 0 ? new Date(sortedMeasurements[0].logged_at).getTime() : 0
   const chartData = sortedMeasurements.map(m => ({
-    minutesElapsed: Math.round((new Date(m.logged_at).getTime() - firstTs) / 60000),
+    minutesElapsed: (new Date(m.logged_at).getTime() - firstTs) / 60000,
+    ts: new Date(m.logged_at).getTime(),
     ph: m.ph ?? null,
     sg: m.specific_gravity ?? null,
     abv: m.alcohol_by_volume ?? null,
@@ -232,7 +233,10 @@ export default function PublicProjectViewPage() {
               <YAxis domain={[0, 14]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
               <Tooltip contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }}
                 formatter={(v: number) => [`${v} pH`, 'pH']}
-                labelFormatter={l => firstTs ? format(new Date(firstTs + Number(l) * 60 * 1000), 'MMM d, yyyy h:mm a') : ''} />
+                labelFormatter={(_l, payload) => {
+                  const ts = (payload as any)?.[0]?.payload?.ts
+                  return ts ? format(new Date(ts), 'MMM d, yyyy h:mm a') : ''
+                }} />
               <Line type="monotone" dataKey="ph" stroke="#4a6741" strokeWidth={2.5} dot={{ fill: '#4a6741', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>
