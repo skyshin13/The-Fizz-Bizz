@@ -1339,7 +1339,10 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                   <button key={String(val)}
                     onClick={() => {
                       if (val === -1) {
-                        setShowCustom(v => !v)
+                        const opening = !showCustom
+                        setShowCustom(opening)
+                        if (opening) setViewHours(-1)
+                        else setViewHours('all')
                       } else {
                         setShowCustom(false)
                         setViewHours(val)
