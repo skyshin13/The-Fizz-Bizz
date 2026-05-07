@@ -32,6 +32,8 @@ export type FermentationType =
 
 export type ProjectStatus = 'active' | 'completed' | 'failed' | 'paused'
 
+export type ProjectVisibility = 'everyone' | 'friends' | 'followers' | 'private'
+
 export interface User {
   id: number
   email: string
@@ -95,6 +97,7 @@ export interface Project {
   cover_photo_url?: string
   sugar_amount_grams?: number
   is_public: boolean
+  visibility: ProjectVisibility
   created_at: string
   measurements: Measurement[]
   observations: Observation[]
@@ -140,6 +143,17 @@ export interface PublicUserProfile extends PublicUser {
   friendship_id?: number
   friendship_status?: 'pending' | 'accepted'
   is_requester?: boolean
+}
+
+export interface ProjectComment {
+  id: number
+  project_id: number
+  user_id: number
+  content: string
+  created_at: string
+  author_username: string
+  author_display_name?: string
+  author_avatar_url?: string
 }
 
 export interface Reminder {

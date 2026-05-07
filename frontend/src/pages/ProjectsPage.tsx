@@ -2,11 +2,11 @@ import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
-import { Project, FermentationType } from '../types'
+import { Project, FermentationType, ProjectVisibility } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Dna, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Clock, Trash2, ImagePlus, X, Globe, Lock, Users, UserCheck, Dna, AlertTriangle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 const toC = (f: number) => (f - 32) * 5 / 9
@@ -33,8 +33,7 @@ export default function ProjectsPage() {
   const filtered = projects.filter(p => {
     if (filterType !== 'all' && p.fermentation_type !== filterType) return false
     if (filterStatus !== 'all' && p.status !== filterStatus) return false
-    if (filterVisibility === 'public' && !p.is_public) return false
-    if (filterVisibility === 'private' && p.is_public) return false
+    if (filterVisibility !== 'all' && p.visibility !== filterVisibility) return false
     if (search) {
       const blob = [
         p.name,
@@ -117,9 +116,11 @@ export default function ProjectsPage() {
         </div>
         <div className={styles.filterButtons}>
           {[
-            { value: 'all', label: 'All' },
-            { value: 'public', label: '🌐 Public' },
-            { value: 'private', label: '🔒 Private' },
+            { value: 'all',       label: 'All' },
+            { value: 'everyone',  label: '🌐 Public' },
+            { value: 'friends',   label: '👥 Friends' },
+            { value: 'followers', label: '👤 Followers' },
+            { value: 'private',   label: '🔒 Private' },
           ].map(({ value, label }) => (
             <button key={value} onClick={() => setFilterVisibility(value)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 500, background: filterVisibility === value ? 'var(--moss)' : 'var(--card-bg)', color: filterVisibility === value ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
               {label}
@@ -218,9 +219,10 @@ function ProjectRow({ project, onDelete, getEmoji }: { project: Project; onDelet
           <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '20px', background: project.status === 'active' ? '#4a674118' : '#3d4e5c18', color: project.status === 'active' ? 'var(--moss)' : 'var(--slate)' }}>
             {project.status}
           </span>
-          <span title={project.is_public ? 'Public' : 'Private'} style={{ display: 'flex', alignItems: 'center', color: project.is_public ? 'var(--moss)' : 'var(--text-muted)' }}>
-            {project.is_public ? <Globe size={12} /> : <Lock size={12} />}
-          </span>
+          {project.visibility === 'everyone' && <span title="Public" style={{ color: 'var(--moss)' }}><Globe size={12} /></span>}
+          {project.visibility === 'friends' && <span title="Friends only" style={{ color: 'var(--amber)' }}><Users size={12} /></span>}
+          {project.visibility === 'followers' && <span title="Followers only" style={{ color: 'var(--slate)' }}><UserCheck size={12} /></span>}
+          {(!project.visibility || project.visibility === 'private') && <span title="Private" style={{ color: 'var(--text-muted)' }}><Lock size={12} /></span>}
           <button onClick={e => { e.preventDefault(); onDelete() }} style={{ padding: 4, background: 'transparent', color: 'var(--text-muted)', borderRadius: 4 }}>
             <Trash2 size={13} />
           </button>
@@ -238,7 +240,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
     description: '', batch_size_liters: '', initial_gravity: '', initial_ph: '',
     fermentation_temp_celsius: '', vessel_type: '', target_end_date: '', notes: '',
     sugar_amount_grams: '',
-    is_public: false,
+    visibility: 'private' as ProjectVisibility,
   })
   const [yeastId, setYeastId] = useState<string>('')
   const [yeastSearch, setYeastSearch] = useState('')
@@ -300,6 +302,8 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
         target_end_date: form.target_end_date || undefined,
         notes: form.notes || undefined,
         sugar_amount_grams: form.sugar_amount_grams ? parseFloat(form.sugar_amount_grams) : undefined,
+        visibility: form.visibility,
+        is_public: form.visibility === 'everyone',
         yeast_id: isAlcohol && yeastId ? parseInt(yeastId) : undefined,
       })
       toast.success('Project created! 🫧')
@@ -398,18 +402,18 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
               <textarea value={form.notes} onChange={set('notes')} placeholder="Reminders, sourcing info, anything else..." style={{ ...iStyle, resize: 'vertical', minHeight: '60px' }} />
             </Field>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer', padding: '0.75rem', background: form.is_public ? '#4a674112' : 'transparent', borderRadius: '8px', border: `1px solid ${form.is_public ? 'var(--moss-light)' : 'var(--border)'}`, transition: 'all 0.2s' }}>
-              <input
-                type="checkbox"
-                checked={form.is_public}
-                onChange={e => setForm(prev => ({ ...prev, is_public: e.target.checked }))}
-                style={{ width: 16, height: 16, accentColor: 'var(--moss)', flexShrink: 0 }}
-              />
-              <div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Make this project public</div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>Public projects appear in the Explore feed for others to discover</div>
-              </div>
-            </label>
+            <Field label="Visibility">
+              <select
+                value={form.visibility}
+                onChange={e => setForm(prev => ({ ...prev, visibility: e.target.value as ProjectVisibility }))}
+                style={iStyle}
+              >
+                <option value="private">🔒 Private — only me</option>
+                <option value="friends">👥 Friends only</option>
+                <option value="followers">👤 Followers only</option>
+                <option value="everyone">🌐 Everyone — appears in Explore</option>
+              </select>
+            </Field>
 
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useFermentationTypes } from '../hooks/useLookups'
-import { ArrowLeft, FlaskConical, Thermometer, Droplets, Activity, Wind, User } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
+import { ArrowLeft, FlaskConical, Thermometer, Droplets, Activity, Wind, Heart, MessageCircle, Send, Trash2 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
+import { ProjectComment } from '../types'
 
 const toF = (c: number) => Math.round((c * 9 / 5 + 32) * 10) / 10
 const ALCOHOL_TYPES = new Set(['beer', 'wine', 'mead', 'cider', 'alcohol_brewing'])
@@ -53,22 +55,82 @@ interface PublicProjectDetail {
   measurements: SharedMeasurement[]
   observations: SharedObservation[]
   yeast_strain: SharedYeast | null
+  like_count: number
+  is_liked_by_me: boolean
+  comment_count: number
 }
 
 export default function PublicProjectViewPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [project, setProject] = useState<PublicProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [lightbox, setLightbox] = useState<string | null>(null)
   const { getEmoji } = useFermentationTypes()
 
+  // Likes
+  const [liked, setLiked] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [liking, setLiking] = useState(false)
+
+  // Comments
+  const [comments, setComments] = useState<ProjectComment[]>([])
+  const [commentText, setCommentText] = useState('')
+  const [submittingComment, setSubmittingComment] = useState(false)
+  const commentInputRef = useRef<HTMLTextAreaElement>(null)
+
+  const loadComments = () =>
+    api.get(`/projects/${id}/comments`).then(r => setComments(r.data)).catch(() => {})
+
   useEffect(() => {
     api.get(`/projects/${id}/public`)
-      .then(r => setProject(r.data))
+      .then(r => {
+        setProject(r.data)
+        setLiked(r.data.is_liked_by_me)
+        setLikeCount(r.data.like_count)
+      })
       .catch(() => navigate('/explore', { replace: true }))
       .finally(() => setLoading(false))
+    loadComments()
   }, [id])
+
+  const toggleLike = async () => {
+    if (liking) return
+    setLiking(true)
+    const wasLiked = liked
+    setLiked(!wasLiked)
+    setLikeCount(c => wasLiked ? c - 1 : c + 1)
+    try {
+      if (wasLiked) await api.delete(`/projects/${id}/like`)
+      else await api.post(`/projects/${id}/like`)
+    } catch {
+      setLiked(wasLiked)
+      setLikeCount(c => wasLiked ? c + 1 : c - 1)
+    } finally {
+      setLiking(false)
+    }
+  }
+
+  const submitComment = async () => {
+    const text = commentText.trim()
+    if (!text || submittingComment) return
+    setSubmittingComment(true)
+    try {
+      const r = await api.post(`/projects/${id}/comments`, { content: text })
+      setComments(prev => [...prev, r.data])
+      setCommentText('')
+    } catch {
+      /* ignore */
+    } finally {
+      setSubmittingComment(false)
+    }
+  }
+
+  const deleteComment = async (commentId: number) => {
+    await api.delete(`/projects/${id}/comments/${commentId}`)
+    setComments(prev => prev.filter(c => c.id !== commentId))
+  }
 
   if (loading) return (
     <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
@@ -138,7 +200,23 @@ export default function PublicProjectViewPage() {
           </div>
         </div>
 
-        {/* Author */}
+        {/* Like bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.75rem' }}>
+          <button
+            onClick={toggleLike}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: `1px solid ${liked ? '#c4705a' : 'var(--border)'}`, background: liked ? '#c4705a18' : 'transparent', color: liked ? '#c4705a' : 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
+          >
+            <Heart size={14} fill={liked ? '#c4705a' : 'none'} /> {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+          </button>
+          <button
+            onClick={() => commentInputRef.current?.focus()}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' }}
+          >
+            <MessageCircle size={14} /> {comments.length} comment{comments.length !== 1 ? 's' : ''}
+          </button>
+        </div>
+
+      {/* Author */}
         <Link
           to={`/profile/${project.author_username}`}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.875rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '10px', textDecoration: 'none' }}
@@ -272,6 +350,67 @@ export default function PublicProjectViewPage() {
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{project.notes}</p>
         </div>
       )}
+
+      {/* Comments */}
+      <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)', marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Comments {comments.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({comments.length})</span>}
+        </h2>
+
+        {comments.length === 0 && (
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>No comments yet. Be the first!</p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '1.25rem' }}>
+          {comments.map(c => {
+            const cAuthor = c.author_display_name || c.author_username
+            const isOwn = user?.id === c.user_id
+            return (
+              <div key={c.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '0.75rem', color: 'var(--brown-dark)', flexShrink: 0, overflow: 'hidden' }}>
+                  {c.author_avatar_url ? (
+                    <img src={c.author_avatar_url} alt={cAuthor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : cAuthor[0]?.toUpperCase()}
+                </div>
+                <div style={{ flex: 1, background: 'var(--parchment)', borderRadius: '10px', padding: '0.6rem 0.875rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{cAuthor}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
+                      {isOwn && (
+                        <button onClick={() => deleteComment(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
+                          <Trash2 size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{c.content}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Comment input */}
+        <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'flex-end' }}>
+          <textarea
+            ref={commentInputRef}
+            value={commentText}
+            onChange={e => setCommentText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
+            placeholder="Add a comment..."
+            rows={2}
+            style={{ flex: 1, padding: '0.6rem 0.875rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.875rem', resize: 'none', fontFamily: 'DM Sans, sans-serif' }}
+          />
+          <button
+            onClick={submitComment}
+            disabled={!commentText.trim() || submittingComment}
+            style={{ padding: '0.6rem 0.875rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', border: 'none', cursor: commentText.trim() ? 'pointer' : 'default', opacity: commentText.trim() ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, fontSize: '0.82rem' }}
+          >
+            <Send size={14} /> Post
+          </button>
+        </div>
+      </div>
 
       {/* Lightbox */}
       {lightbox && (

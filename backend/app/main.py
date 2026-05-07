@@ -19,8 +19,17 @@ def _run_migrations():
             ALTER TABLE project_cer_states
             ADD COLUMN IF NOT EXISTS interval_seconds INTEGER NOT NULL DEFAULT 30
         """))
+        for stmt in [
+            "ALTER TABLE fermentation_projects ADD COLUMN sugar_amount_grams REAL",
+            "ALTER TABLE fermentation_projects ADD COLUMN visibility TEXT DEFAULT 'private'",
+        ]:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                pass
+        # Back-fill visibility from is_public for existing rows
         try:
-            conn.execute(text("ALTER TABLE fermentation_projects ADD COLUMN sugar_amount_grams REAL"))
+            conn.execute(text("UPDATE fermentation_projects SET visibility = 'everyone' WHERE is_public = 1 AND (visibility IS NULL OR visibility = 'private')"))
         except Exception:
             pass
         conn.commit()

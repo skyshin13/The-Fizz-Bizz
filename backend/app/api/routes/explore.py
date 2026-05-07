@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from typing import List, Optional
 from app.db.database import get_db
-from app.models.models import FermentationProject, MeasurementLog, User, Friendship
+from app.models.models import FermentationProject, MeasurementLog, User, Friendship, FriendshipStatus, UserFollow
 from app.schemas.schemas import PublicProjectOut, PublicUserOut, SharedProjectOut, SharedMeasurementOut
 from app.api.deps import get_current_user
 
@@ -11,13 +12,16 @@ router = APIRouter(prefix="/explore", tags=["Explore"])
 
 @router.get("/share/{project_id}", response_model=SharedProjectOut)
 def get_shared_project(project_id: int, db: Session = Depends(get_db)):
-    """Public endpoint — no auth required. Returns project only if is_public=True."""
+    """Public endpoint — no auth required. Returns project only if visibility='everyone'."""
     project = (
         db.query(FermentationProject)
         .options(joinedload(FermentationProject.owner))
         .filter(
             FermentationProject.id == project_id,
-            FermentationProject.is_public == True,
+            or_(
+                FermentationProject.visibility == "everyone",
+                FermentationProject.is_public == True,
+            ),
         )
         .first()
     )
@@ -52,21 +56,53 @@ def explore_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Collect IDs of accepted friends and users current_user follows
+    friendships = db.query(Friendship).filter(
+        or_(
+            Friendship.requester_id == current_user.id,
+            Friendship.receiver_id == current_user.id,
+        ),
+        Friendship.status == FriendshipStatus.ACCEPTED,
+    ).all()
+    friend_ids = {
+        f.receiver_id if f.requester_id == current_user.id else f.requester_id
+        for f in friendships
+    }
+    following_ids = {
+        f.followed_id
+        for f in db.query(UserFollow).filter_by(follower_id=current_user.id).all()
+    }
+
     q = (
         db.query(FermentationProject)
         .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.owner))
-        .filter(FermentationProject.is_public == True)
-        .filter(FermentationProject.user_id != current_user.id)
+        .filter(
+            FermentationProject.user_id != current_user.id,
+            FermentationProject.visibility.in_(["everyone", "friends", "followers"]),
+        )
     )
     if fermentation_type:
         q = q.filter(FermentationProject.fermentation_type == fermentation_type)
 
-    projects = (
+    candidates = (
         q.order_by(FermentationProject.created_at.desc())
-        .offset((page - 1) * per_page)
-        .limit(per_page)
         .all()
     )
+
+    # Filter by access rights
+    visible = []
+    for p in candidates:
+        vis = p.visibility or ("everyone" if p.is_public else "private")
+        if vis == "everyone":
+            visible.append(p)
+        elif vis == "friends" and p.user_id in friend_ids:
+            visible.append(p)
+        elif vis == "followers" and p.user_id in following_ids:
+            visible.append(p)
+
+    # Manual pagination after filtering
+    start = (page - 1) * per_page
+    projects = visible[start: start + per_page]
 
     return [
         PublicProjectOut(
@@ -118,7 +154,7 @@ def search_users(
             public_project_count=db.query(FermentationProject)
                 .filter(
                     FermentationProject.user_id == u.id,
-                    FermentationProject.is_public == True,
+                    FermentationProject.visibility == "everyone",
                 )
                 .count(),
             friendship_status=friendship_map.get(u.id),

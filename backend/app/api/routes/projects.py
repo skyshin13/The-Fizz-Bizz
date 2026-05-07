@@ -3,12 +3,17 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.database import get_db
-from app.models.models import FermentationProject, MeasurementLog, ObservationNote, ProjectPhoto, Reminder, User, ProjectYeastConnection, YeastProfile, ProjectCERState
+from app.models.models import (
+    FermentationProject, MeasurementLog, ObservationNote, ProjectPhoto,
+    Reminder, User, ProjectYeastConnection, YeastProfile, ProjectCERState,
+    Friendship, FriendshipStatus, UserFollow, ProjectLike, ProjectComment,
+)
 from app.schemas.schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
     MeasurementCreate, MeasurementOut,
     ObservationCreate, ObservationOut,
     PublicProjectDetailOut, SharedMeasurementOut, SharedObservationOut, SharedYeastOut,
+    ProjectCommentCreate, ProjectCommentOut,
 )
 from app.api.deps import get_current_user
 from app.services.calculations import calculate_abv
@@ -24,6 +29,28 @@ _USER_MEAS_FILTER = or_(
 )
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
+
+
+def _can_view(project, current_user, db) -> bool:
+    """Return True if current_user is allowed to view this project."""
+    if project.user_id == current_user.id:
+        return True
+    vis = project.visibility or ("everyone" if project.is_public else "private")
+    if vis == "everyone":
+        return True
+    if vis == "friends":
+        return db.query(Friendship).filter(
+            or_(
+                (Friendship.requester_id == current_user.id) & (Friendship.receiver_id == project.user_id),
+                (Friendship.requester_id == project.user_id) & (Friendship.receiver_id == current_user.id),
+            ),
+            Friendship.status == FriendshipStatus.ACCEPTED,
+        ).first() is not None
+    if vis == "followers":
+        return db.query(UserFollow).filter_by(
+            follower_id=current_user.id, followed_id=project.user_id
+        ).first() is not None
+    return False
 
 
 def _attach_yeast_strain(project, db):
@@ -108,6 +135,9 @@ def create_project(
 ):
     data = body.model_dump()
     yeast_id = data.pop('yeast_id', None)
+    # Sync is_public from visibility
+    vis = data.get('visibility', 'private')
+    data['is_public'] = vis == 'everyone'
     project = FermentationProject(**data, user_id=current_user.id)
     db.add(project)
     db.commit()
@@ -158,7 +188,13 @@ def update_project(
     ).first()
     if not project:
         raise HTTPException(404, "Project not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    # Keep visibility and is_public in sync
+    if 'visibility' in updates:
+        updates['is_public'] = updates['visibility'] == 'everyone'
+    elif 'is_public' in updates:
+        updates['visibility'] = 'everyone' if updates['is_public'] else 'private'
+    for field, value in updates.items():
         setattr(project, field, value)
     db.commit()
     db.refresh(project)
@@ -214,6 +250,8 @@ def delete_project(
     db.query(ProjectPhoto).filter(ProjectPhoto.project_id == project_id).delete(synchronize_session=False)
     db.query(Reminder).filter(Reminder.project_id == project_id).delete(synchronize_session=False)
     db.query(ProjectYeastConnection).filter(ProjectYeastConnection.project_id == project_id).delete(synchronize_session=False)
+    db.query(ProjectLike).filter(ProjectLike.project_id == project_id).delete(synchronize_session=False)
+    db.query(ProjectComment).filter(ProjectComment.project_id == project_id).delete(synchronize_session=False)
     db.delete(project)
     db.commit()
 
@@ -295,14 +333,13 @@ def get_public_project(
             joinedload(FermentationProject.observations),
             joinedload(FermentationProject.measurements),
         )
-        .filter(
-            FermentationProject.id == project_id,
-            FermentationProject.is_public == True,
-        )
+        .filter(FermentationProject.id == project_id)
         .first()
     )
     if not project:
-        raise HTTPException(404, "Project not found or is not public")
+        raise HTTPException(404, "Project not found")
+    if not _can_view(project, current_user, db):
+        raise HTTPException(403, "You don't have access to this project")
 
     conn = db.query(ProjectYeastConnection).filter_by(project_id=project_id).first()
     yeast_strain = None
@@ -321,6 +358,10 @@ def get_public_project(
         if any([m.ph, m.specific_gravity, m.alcohol_by_volume, m.brix, m.notes])
     ]
     user_measurements.sort(key=lambda m: m.logged_at)
+
+    like_count = db.query(ProjectLike).filter_by(project_id=project_id).count()
+    is_liked   = db.query(ProjectLike).filter_by(project_id=project_id, user_id=current_user.id).first() is not None
+    comment_count = db.query(ProjectComment).filter_by(project_id=project_id).count()
 
     return PublicProjectDetailOut(
         id=project.id,
@@ -351,4 +392,112 @@ def get_public_project(
             for o in sorted(project.observations, key=lambda o: o.created_at)
         ],
         yeast_strain=yeast_strain,
+        like_count=like_count,
+        is_liked_by_me=is_liked,
+        comment_count=comment_count,
     )
+
+
+# ─── Likes ─────────────────────────────────────────────────────────────────────
+
+@router.post("/{project_id}/like", status_code=204)
+def like_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter_by(id=project_id).first()
+    if not project or not _can_view(project, current_user, db):
+        raise HTTPException(404, "Project not found")
+    existing = db.query(ProjectLike).filter_by(project_id=project_id, user_id=current_user.id).first()
+    if not existing:
+        db.add(ProjectLike(project_id=project_id, user_id=current_user.id))
+        db.commit()
+
+
+@router.delete("/{project_id}/like", status_code=204)
+def unlike_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.query(ProjectLike).filter_by(project_id=project_id, user_id=current_user.id).delete()
+    db.commit()
+
+
+# ─── Comments ──────────────────────────────────────────────────────────────────
+
+@router.get("/{project_id}/comments", response_model=List[ProjectCommentOut])
+def list_comments(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter_by(id=project_id).first()
+    if not project or not _can_view(project, current_user, db):
+        raise HTTPException(404, "Project not found")
+    rows = (
+        db.query(ProjectComment)
+        .filter_by(project_id=project_id)
+        .order_by(ProjectComment.created_at)
+        .all()
+    )
+    user_ids = list({r.user_id for r in rows})
+    users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    result = []
+    for r in rows:
+        author = users.get(r.user_id)
+        result.append(ProjectCommentOut(
+            id=r.id,
+            project_id=r.project_id,
+            user_id=r.user_id,
+            content=r.content,
+            created_at=r.created_at,
+            author_username=author.username if author else "unknown",
+            author_display_name=author.display_name if author else None,
+            author_avatar_url=author.avatar_url if author else None,
+        ))
+    return result
+
+
+@router.post("/{project_id}/comments", response_model=ProjectCommentOut, status_code=201)
+def add_comment(
+    project_id: int,
+    body: ProjectCommentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter_by(id=project_id).first()
+    if not project or not _can_view(project, current_user, db):
+        raise HTTPException(404, "Project not found")
+    comment = ProjectComment(project_id=project_id, user_id=current_user.id, content=body.content.strip())
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return ProjectCommentOut(
+        id=comment.id,
+        project_id=comment.project_id,
+        user_id=comment.user_id,
+        content=comment.content,
+        created_at=comment.created_at,
+        author_username=current_user.username,
+        author_display_name=current_user.display_name,
+        author_avatar_url=current_user.avatar_url,
+    )
+
+
+@router.delete("/{project_id}/comments/{comment_id}", status_code=204)
+def delete_comment(
+    project_id: int,
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    comment = db.query(ProjectComment).filter_by(id=comment_id, project_id=project_id).first()
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    project = db.query(FermentationProject).filter_by(id=project_id).first()
+    if comment.user_id != current_user.id and (not project or project.user_id != current_user.id):
+        raise HTTPException(403, "Not authorized")
+    db.delete(comment)
+    db.commit()

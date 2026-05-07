@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List, Any
 from datetime import datetime
-from app.models.models import FermentationType, ProjectStatus
+from app.models.models import FermentationType, ProjectStatus, ProjectVisibility
 
 
 # ─── Auth Schemas ───────────────────────────────────────────────────────────
@@ -174,6 +174,7 @@ class ProjectCreate(BaseModel):
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None
     sugar_amount_grams: Optional[float] = None
+    visibility: str = "private"
     is_public: bool = False
     yeast_id: Optional[int] = None
 
@@ -186,6 +187,7 @@ class ProjectUpdate(BaseModel):
     end_date: Optional[datetime] = None
     notes: Optional[str] = None
     is_public: Optional[bool] = None
+    visibility: Optional[str] = None
     cover_photo_url: Optional[str] = None
     sugar_amount_grams: Optional[float] = None
 
@@ -210,6 +212,7 @@ class ProjectOut(BaseModel):
     cover_photo_url: Optional[str] = None
     sugar_amount_grams: Optional[float] = None
     is_public: bool = False
+    visibility: str = "private"
     created_at: datetime
     measurements: List[MeasurementOut] = []
     observations: List[ObservationOut] = []
@@ -559,6 +562,29 @@ class PublicProjectDetailOut(BaseModel):
     measurements: List[SharedMeasurementOut] = []
     observations: List[SharedObservationOut] = []
     yeast_strain: Optional[SharedYeastOut] = None
+    like_count: int = 0
+    is_liked_by_me: bool = False
+    comment_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Comment Schemas ──────────────────────────────────────────────────────────
+
+class ProjectCommentCreate(BaseModel):
+    content: str
+
+
+class ProjectCommentOut(BaseModel):
+    id: int
+    project_id: int
+    user_id: int
+    content: str
+    created_at: datetime
+    author_username: str
+    author_display_name: Optional[str] = None
+    author_avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True

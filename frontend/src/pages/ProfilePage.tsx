@@ -48,10 +48,13 @@ function OwnProfile() {
   }
 
   const removeFriend = async (id: number) => {
+    // Optimistic removal
+    const prev = friends
+    setFriends(f => f.filter(fr => fr.id !== id))
     try {
       await api.delete(`/friends/${id}`)
-      loadFriends()
     } catch {
+      setFriends(prev)
       toast.error('Failed to remove')
     }
   }
@@ -84,7 +87,7 @@ function OwnProfile() {
         <EditProfileModal
           me={me}
           onClose={() => setShowEdit(false)}
-          onSaved={() => { refreshUser(); setShowEdit(false) }}
+          onSaved={() => { refreshUser().then(() => setShowEdit(false)) }}
         />
       )}
 
@@ -332,13 +335,16 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
 
       if (avatarFile) {
         const ext = avatarFile.name.split('.').pop()
-        const path = `${me.id}/avatar.${ext}`
+        const path = `avatars/${me!.id}_${Date.now()}.${ext}`
         const { error: uploadError } = await supabase.storage
-          .from('avatars')
+          .from('project-photos')
           .upload(path, avatarFile, { upsert: true })
-        if (uploadError) throw new Error('Avatar upload failed')
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-        avatar_url = publicUrl
+        if (uploadError) {
+          toast.error('Photo upload failed — profile saved without new photo.')
+        } else {
+          const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(path)
+          avatar_url = urlData.publicUrl
+        }
       }
 
       await api.patch('/users/me', {

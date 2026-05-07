@@ -218,41 +218,28 @@ export default function ProjectDetailPage() {
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No yeast strain set</span>
                 )}
               </div>
-              {/* Visibility toggle */}
+              {/* Visibility */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginTop: '0.75rem' }}>
-                {project.is_public ? (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await api.patch(`/projects/${project.id}`, { is_public: false })
-                        await load()
-                        toast.success('Project set to private')
-                      } catch {
-                        toast.error('Failed to update visibility')
-                      }
-                    }}
-                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--moss)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--moss)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
-                    title="Click to make private"
-                  >
-                    <Globe size={11} /> Public
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await api.patch(`/projects/${project.id}`, { is_public: true })
-                        await load()
-                        toast.success('Project is now public')
-                      } catch {
-                        toast.error('Failed to update visibility')
-                      }
-                    }}
-                    style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
-                  >
-                    <Lock size={11} /> Make Public
-                  </button>
-                )}
-                {project.is_public && (
+                <select
+                  value={project.visibility || (project.is_public ? 'everyone' : 'private')}
+                  onChange={async e => {
+                    const vis = e.target.value
+                    try {
+                      await api.patch(`/projects/${project.id}`, { visibility: vis, is_public: vis === 'everyone' })
+                      await load()
+                      toast.success('Visibility updated')
+                    } catch {
+                      toast.error('Failed to update visibility')
+                    }
+                  }}
+                  style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', cursor: 'pointer' }}
+                >
+                  <option value="private">🔒 Private</option>
+                  <option value="friends">👥 Friends only</option>
+                  <option value="followers">👤 Followers only</option>
+                  <option value="everyone">🌐 Public</option>
+                </select>
+                {(project.visibility === 'everyone' || project.is_public) && (
                   <button
                     onClick={() => {
                       const url = `${window.location.origin}/share/${project.id}`

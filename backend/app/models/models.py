@@ -35,6 +35,13 @@ class FriendshipStatus(str, enum.Enum):
     ACCEPTED = "accepted"
 
 
+class ProjectVisibility(str, enum.Enum):
+    EVERYONE  = "everyone"
+    FRIENDS   = "friends"
+    FOLLOWERS = "followers"
+    PRIVATE   = "private"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -57,6 +64,10 @@ class User(Base):
     reminders = relationship("Reminder", back_populates="user")
     sent_requests = relationship("Friendship", foreign_keys="[Friendship.requester_id]", back_populates="requester")
     received_requests = relationship("Friendship", foreign_keys="[Friendship.receiver_id]", back_populates="receiver")
+    following = relationship("UserFollow", foreign_keys="[UserFollow.follower_id]", back_populates="follower", cascade="all, delete-orphan")
+    followers_rel = relationship("UserFollow", foreign_keys="[UserFollow.followed_id]", back_populates="followed", cascade="all, delete-orphan")
+    likes = relationship("ProjectLike", back_populates="user", cascade="all, delete-orphan")
+    project_comments = relationship("ProjectComment", back_populates="user", cascade="all, delete-orphan")
 
 
 class FermentationProject(Base):
@@ -82,6 +93,7 @@ class FermentationProject(Base):
     cover_photo_url = Column(String)
     sugar_amount_grams = Column(Float)
     is_public = Column(Boolean, default=False)
+    visibility = Column(String, default="private")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -93,6 +105,8 @@ class FermentationProject(Base):
     reminders = relationship("Reminder", back_populates="project", cascade="all, delete-orphan")
     yeast_connections = relationship("ProjectYeastConnection", back_populates="project", cascade="all, delete-orphan")
     cer_state = relationship("ProjectCERState", back_populates="project", cascade="all, delete-orphan", uselist=False)
+    likes = relationship("ProjectLike", back_populates="project", cascade="all, delete-orphan")
+    comments = relationship("ProjectComment", back_populates="project", cascade="all, delete-orphan")
 
 
 class MeasurementLog(Base):
@@ -308,3 +322,40 @@ class ProjectCERState(Base):
     psi_released   = Column(Float, default=0.0)   # total PSI removed by CO₂ release events
 
     project = relationship("FermentationProject", back_populates="cer_state")
+
+
+class UserFollow(Base):
+    __tablename__ = "user_follows"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    follower_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    followed_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+    follower = relationship("User", foreign_keys=[follower_id], back_populates="following")
+    followed = relationship("User", foreign_keys=[followed_id], back_populates="followers_rel")
+
+
+class ProjectLike(Base):
+    __tablename__ = "project_likes"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    project = relationship("FermentationProject", back_populates="likes")
+    user    = relationship("User", back_populates="likes")
+
+
+class ProjectComment(Base):
+    __tablename__ = "project_comments"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content    = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    project = relationship("FermentationProject", back_populates="comments")
+    user    = relationship("User", back_populates="project_comments")
