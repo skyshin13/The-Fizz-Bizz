@@ -77,7 +77,10 @@ export default function Layout() {
         <div className={styles.userSection}>
           <div className={styles.userCard}>
             <div className={styles.avatar}>
-              {user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?'}
+              {user?.avatar_url
+                ? <img src={user.avatar_url} alt="avatar" className={styles.avatarImg} />
+                : (user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?')
+              }
             </div>
             <div className={styles.userInfo}>
               <div className={styles.userName}>{user?.display_name || user?.username}</div>
@@ -107,7 +110,10 @@ export default function Layout() {
             }
           >
             <span className={styles.iconWrap}>
-              <Icon size={22} />
+              {to === '/profile' && user?.avatar_url
+                ? <img src={user.avatar_url} alt="avatar" className={styles.bottomNavAvatar} />
+                : <Icon size={22} />
+              }
               {to === '/profile' && pendingCount > 0 && (
                 <span className={styles.countBadge}>{pendingCount > 9 ? '9+' : pendingCount}</span>
               )}
