@@ -15,11 +15,8 @@ logger = logging.getLogger(__name__)
 def _run_migrations():
     """Apply any schema changes that create_all won't handle (new columns on existing tables)."""
     with engine.connect() as conn:
-        conn.execute(text("""
-            ALTER TABLE project_cer_states
-            ADD COLUMN IF NOT EXISTS interval_seconds INTEGER NOT NULL DEFAULT 30
-        """))
         for stmt in [
+            "ALTER TABLE project_cer_states ADD COLUMN interval_seconds INTEGER NOT NULL DEFAULT 30",
             "ALTER TABLE fermentation_projects ADD COLUMN sugar_amount_grams REAL",
             "ALTER TABLE fermentation_projects ADD COLUMN visibility TEXT DEFAULT 'private'",
         ]:
@@ -29,7 +26,10 @@ def _run_migrations():
                 pass
         # Back-fill visibility from is_public for existing rows
         try:
-            conn.execute(text("UPDATE fermentation_projects SET visibility = 'everyone' WHERE is_public = 1 AND (visibility IS NULL OR visibility = 'private')"))
+            conn.execute(text(
+                "UPDATE fermentation_projects SET visibility = 'everyone'"
+                " WHERE is_public = 1 AND (visibility IS NULL OR visibility = 'private')"
+            ))
         except Exception:
             pass
         conn.commit()

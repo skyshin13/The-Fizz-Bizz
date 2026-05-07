@@ -68,17 +68,23 @@ def explore_projects(
         f.receiver_id if f.requester_id == current_user.id else f.requester_id
         for f in friendships
     }
-    following_ids = {
-        f.followed_id
-        for f in db.query(UserFollow).filter_by(follower_id=current_user.id).all()
-    }
+    try:
+        following_ids = {
+            f.followed_id
+            for f in db.query(UserFollow).filter_by(follower_id=current_user.id).all()
+        }
+    except Exception:
+        following_ids = set()
 
     q = (
         db.query(FermentationProject)
         .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.owner))
+        .filter(FermentationProject.user_id != current_user.id)
         .filter(
-            FermentationProject.user_id != current_user.id,
-            FermentationProject.visibility.in_(["everyone", "friends", "followers"]),
+            or_(
+                FermentationProject.is_public == True,
+                FermentationProject.visibility.in_(["everyone", "friends", "followers"]),
+            )
         )
     )
     if fermentation_type:
@@ -154,7 +160,10 @@ def search_users(
             public_project_count=db.query(FermentationProject)
                 .filter(
                     FermentationProject.user_id == u.id,
-                    FermentationProject.visibility == "everyone",
+                    or_(
+                        FermentationProject.is_public == True,
+                        FermentationProject.visibility == "everyone",
+                    ),
                 )
                 .count(),
             friendship_status=friendship_map.get(u.id),
