@@ -114,6 +114,13 @@ export default function Layout() {
             </span>
           </NavLink>
         ))}
+        <button
+          onClick={handleLogout}
+          title="Sign out"
+          className={styles.bottomNavLogout}
+        >
+          <LogOut size={22} />
+        </button>
       </nav>
     </div>
   )
