@@ -1196,6 +1196,19 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   // X-axis offset: use minH directly so zoomed labels always read 0 → windowH
   const xOffset = windowH !== null ? minH : 0
 
+  // Explicit integer ticks — avoids duplicate labels from tickCount rounding
+  const xTicks = useMemo(() => {
+    const rangeH = windowH !== null ? windowH : maxH
+    if (rangeH <= 0) return [0]
+    const step = rangeH <= 6 ? 1 : rangeH <= 12 ? 2 : rangeH <= 24 ? 4 : rangeH <= 48 ? 8 : rangeH <= 96 ? 12 : 24
+    const ticks: number[] = []
+    const startI = Math.ceil(xOffset / step) * step
+    for (let t = startI; t <= xOffset + rangeH + 0.01; t += step) {
+      ticks.push(parseFloat(t.toFixed(6)))
+    }
+    return ticks
+  }, [windowH, maxH, xOffset])
+
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
     s.strain_type.toLowerCase().includes(strainSearch.toLowerCase()) ||
@@ -1419,10 +1432,10 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                   dataKey="hours_elapsed"
                   type="number"
                   domain={['dataMin', 'dataMax']}
+                  ticks={xTicks}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
                   label={{ value: windowH !== null ? `Last ${windowH.toFixed(0)}h` : 'Hours since start', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
-                  tickCount={8}
-                  tickFormatter={(v: number) => `${(v - xOffset).toFixed(0)}h`}
+                  tickFormatter={(v: number) => `${Math.round(v - xOffset)}h`}
                 />
                 <YAxis
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
