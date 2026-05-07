@@ -75,7 +75,7 @@ export default function Layout() {
 
         {/* User section */}
         <div className={styles.userSection}>
-          <div className={styles.userCard}>
+          <NavLink to="/profile" className={styles.userCard}>
             <div className={styles.avatar}>
               {user?.avatar_url
                 ? <img src={user.avatar_url} alt="avatar" className={styles.avatarImg} />
@@ -86,7 +86,7 @@ export default function Layout() {
               <div className={styles.userName}>{user?.display_name || user?.username}</div>
               <div className={styles.userEmail}>{user?.email}</div>
             </div>
-          </div>
+          </NavLink>
           <button onClick={handleLogout} className={styles.logoutBtn} title="Sign out">
             <LogOut size={16} />
           </button>
