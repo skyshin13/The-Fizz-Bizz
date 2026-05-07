@@ -74,27 +74,27 @@ class FermentationProject(Base):
     __tablename__ = "fermentation_projects"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
-    fermentation_type = Column(SAEnum(FermentationType), nullable=False)
-    status = Column(SAEnum(ProjectStatus), default=ProjectStatus.ACTIVE)
+    fermentation_type = Column(SAEnum(FermentationType), nullable=False, index=True)
+    status = Column(SAEnum(ProjectStatus), default=ProjectStatus.ACTIVE, index=True)
     description = Column(Text)
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=True)
     batch_size_liters = Column(Float)
     start_date = Column(DateTime(timezone=True))
     end_date = Column(DateTime(timezone=True))
     target_end_date = Column(DateTime(timezone=True))
-    initial_gravity = Column(Float)  # OG for ABV calculation
-    final_gravity = Column(Float)    # FG for ABV calculation
+    initial_gravity = Column(Float)
+    final_gravity = Column(Float)
     initial_ph = Column(Float)
     fermentation_temp_celsius = Column(Float)
-    vessel_type = Column(String)     # e.g. "mason jar", "carboy", "bucket"
+    vessel_type = Column(String)
     notes = Column(Text)
     cover_photo_url = Column(String)
     sugar_amount_grams = Column(Float)
-    is_public = Column(Boolean, default=False)
-    visibility = Column(String, default="private")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_public = Column(Boolean, default=False, index=True)
+    visibility = Column(String, default="private", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     owner = relationship("User", back_populates="projects")
@@ -113,8 +113,8 @@ class MeasurementLog(Base):
     __tablename__ = "measurement_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False)
-    logged_at = Column(DateTime(timezone=True), server_default=func.now())
+    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False, index=True)
+    logged_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     specific_gravity = Column(Float)
     ph = Column(Float)
     temperature_celsius = Column(Float)
@@ -130,8 +130,8 @@ class ObservationNote(Base):
     __tablename__ = "observation_notes"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     content = Column(Text, nullable=False)
     tags = Column(JSON)          # e.g. ["aroma", "color", "texture"]
     photo_url = Column(String)
@@ -280,9 +280,9 @@ class Friendship(Base):
     __tablename__ = "friendships"
 
     id = Column(Integer, primary_key=True, index=True)
-    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(SAEnum(FriendshipStatus), default=FriendshipStatus.PENDING)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(SAEnum(FriendshipStatus), default=FriendshipStatus.PENDING, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -328,8 +328,8 @@ class UserFollow(Base):
     __tablename__ = "user_follows"
 
     id          = Column(Integer, primary_key=True, index=True)
-    follower_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    followed_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    follower_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    followed_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
     follower = relationship("User", foreign_keys=[follower_id], back_populates="following")
@@ -340,8 +340,8 @@ class ProjectLike(Base):
     __tablename__ = "project_likes"
 
     id         = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False)
-    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     project = relationship("FermentationProject", back_populates="likes")
@@ -352,8 +352,8 @@ class ProjectComment(Base):
     __tablename__ = "project_comments"
 
     id         = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False)
-    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     content    = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

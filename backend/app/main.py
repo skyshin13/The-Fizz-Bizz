@@ -13,12 +13,39 @@ logger = logging.getLogger(__name__)
 
 
 def _run_migrations():
-    """Apply any schema changes that create_all won't handle (new columns on existing tables)."""
+    """Apply any schema changes that create_all won't handle (new columns / indexes on existing tables)."""
     with engine.connect() as conn:
         for stmt in [
+            # Columns
             "ALTER TABLE project_cer_states ADD COLUMN interval_seconds INTEGER NOT NULL DEFAULT 30",
             "ALTER TABLE fermentation_projects ADD COLUMN sugar_amount_grams REAL",
             "ALTER TABLE fermentation_projects ADD COLUMN visibility TEXT DEFAULT 'private'",
+            # Indexes — fermentation_projects
+            "CREATE INDEX IF NOT EXISTS ix_fp_user_id ON fermentation_projects (user_id)",
+            "CREATE INDEX IF NOT EXISTS ix_fp_is_public ON fermentation_projects (is_public)",
+            "CREATE INDEX IF NOT EXISTS ix_fp_visibility ON fermentation_projects (visibility)",
+            "CREATE INDEX IF NOT EXISTS ix_fp_created_at ON fermentation_projects (created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS ix_fp_fermentation_type ON fermentation_projects (fermentation_type)",
+            "CREATE INDEX IF NOT EXISTS ix_fp_status ON fermentation_projects (status)",
+            # Composite for the main explore filter
+            "CREATE INDEX IF NOT EXISTS ix_fp_public_vis ON fermentation_projects (is_public, visibility)",
+            # Indexes — friendships
+            "CREATE INDEX IF NOT EXISTS ix_fs_requester ON friendships (requester_id, status)",
+            "CREATE INDEX IF NOT EXISTS ix_fs_receiver ON friendships (receiver_id, status)",
+            # Indexes — user_follows
+            "CREATE INDEX IF NOT EXISTS ix_uf_follower ON user_follows (follower_id)",
+            "CREATE INDEX IF NOT EXISTS ix_uf_followed ON user_follows (followed_id)",
+            # Indexes — project_likes
+            "CREATE INDEX IF NOT EXISTS ix_pl_project ON project_likes (project_id)",
+            "CREATE INDEX IF NOT EXISTS ix_pl_user ON project_likes (user_id)",
+            "CREATE INDEX IF NOT EXISTS ix_pl_project_user ON project_likes (project_id, user_id)",
+            # Indexes — project_comments
+            "CREATE INDEX IF NOT EXISTS ix_pc_project ON project_comments (project_id)",
+            # Indexes — measurement_logs
+            "CREATE INDEX IF NOT EXISTS ix_ml_project ON measurement_logs (project_id)",
+            "CREATE INDEX IF NOT EXISTS ix_ml_logged_at ON measurement_logs (logged_at)",
+            # Indexes — observation_notes
+            "CREATE INDEX IF NOT EXISTS ix_on_project ON observation_notes (project_id)",
         ]:
             try:
                 conn.execute(text(stmt))
@@ -28,7 +55,7 @@ def _run_migrations():
         try:
             conn.execute(text(
                 "UPDATE fermentation_projects SET visibility = 'everyone'"
-                " WHERE is_public = 1 AND (visibility IS NULL OR visibility = 'private')"
+                " WHERE is_public = TRUE AND (visibility IS NULL OR visibility = 'private')"
             ))
         except Exception:
             pass
