@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
-import { ArrowLeft, FlaskConical, Thermometer, Droplets, Activity, Wind, Heart, MessageCircle, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, FlaskConical, Thermometer, Droplets, Activity, Wind, Heart, MessageCircle, Send, Trash2, Dna } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
 import { ProjectComment } from '../types'
@@ -27,6 +27,7 @@ interface SharedObservation {
 }
 
 interface SharedYeast {
+  yeast_id: number
   name: string
   strain_code: string | null
   brand: string | null
@@ -247,13 +248,6 @@ export default function PublicProjectViewPage() {
         <div className="fade-in-delay-1" style={{ marginBottom: '1.25rem', background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)' }}>
           <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Batch Details</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.625rem' }}>
-            {project.yeast_strain && (
-              <Detail icon={<FlaskConical size={13} />} label="Yeast">
-                {project.yeast_strain.name}
-                {project.yeast_strain.strain_code && <span style={{ fontFamily: 'monospace', opacity: 0.7, fontSize: '0.8em' }}> ({project.yeast_strain.strain_code})</span>}
-                {project.yeast_strain.brand && <span style={{ opacity: 0.7 }}> · {project.yeast_strain.brand}</span>}
-              </Detail>
-            )}
             {project.vessel_type && <Detail icon={<FlaskConical size={13} />} label="Vessel">{project.vessel_type}</Detail>}
             {project.batch_size_liters && <Detail icon={<Droplets size={13} />} label="Batch Size">{project.batch_size_liters} L</Detail>}
             {project.initial_gravity && <Detail icon={<Activity size={13} />} label="OG">{project.initial_gravity.toFixed(3)}</Detail>}
@@ -262,6 +256,30 @@ export default function PublicProjectViewPage() {
               <Detail icon={<Thermometer size={13} />} label="Temp">{toF(project.fermentation_temp_celsius)}°F</Detail>
             )}
           </div>
+          {project.yeast_strain && (
+            <div style={{ marginTop: '0.875rem', paddingTop: '0.875rem', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.625rem' }}>
+              <div>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: '0.2rem' }}>
+                  <Dna size={12} /> Yeast
+                </span>
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                  {project.yeast_strain.name}
+                  {project.yeast_strain.strain_code && (
+                    <span style={{ fontFamily: 'monospace', opacity: 0.7, fontSize: '0.82em', marginLeft: '0.3em' }}>({project.yeast_strain.strain_code})</span>
+                  )}
+                </span>
+                {project.yeast_strain.brand && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>{project.yeast_strain.brand}</span>
+                )}
+              </div>
+              <Link
+                to={`/yeasts?yeast=${project.yeast_strain.yeast_id}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.875rem', background: 'var(--parchment)', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+              >
+                <Dna size={13} /> View Yeast Profile
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

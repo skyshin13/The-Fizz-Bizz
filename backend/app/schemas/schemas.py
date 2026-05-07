@@ -520,6 +520,7 @@ class SharedObservationOut(BaseModel):
 
 
 class SharedYeastOut(BaseModel):
+    yeast_id: int
     name: str
     strain_code: Optional[str] = None
     brand: Optional[str] = None

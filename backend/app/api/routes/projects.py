@@ -347,6 +347,7 @@ def get_public_project(
         yeast = db.query(YeastProfile).filter_by(id=conn.yeast_id).first()
         if yeast:
             yeast_strain = SharedYeastOut(
+                yeast_id=yeast.id,
                 name=yeast.name,
                 strain_code=yeast.strain_code,
                 brand=yeast.brand,
