@@ -490,6 +490,9 @@ class PublicProjectOut(BaseModel):
     author_username: str
     author_display_name: Optional[str] = None
     measurement_count: int = 0
+    like_count: int = 0
+    is_liked_by_me: bool = False
+    comment_count: int = 0
 
     class Config:
         from_attributes = True

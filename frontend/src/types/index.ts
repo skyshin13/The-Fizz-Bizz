@@ -127,6 +127,9 @@ export interface PublicProject {
   author_username: string
   author_display_name?: string
   measurement_count: number
+  like_count: number
+  is_liked_by_me: boolean
+  comment_count: number
 }
 
 export interface FriendRequest {

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from typing import List, Optional
 from app.db.database import get_db
-from app.models.models import FermentationProject, MeasurementLog, User, Friendship, FriendshipStatus, UserFollow
+from app.models.models import FermentationProject, MeasurementLog, User, Friendship, FriendshipStatus, UserFollow, ProjectLike, ProjectComment
 from app.schemas.schemas import PublicProjectOut, PublicUserOut, SharedProjectOut, SharedMeasurementOut
 from app.api.deps import get_current_user
 
@@ -110,6 +110,35 @@ def explore_projects(
     start = (page - 1) * per_page
     projects = visible[start: start + per_page]
 
+    if not projects:
+        return []
+
+    project_ids = [p.id for p in projects]
+
+    # Batch-fetch like counts
+    like_counts = {
+        row.project_id: row.cnt
+        for row in db.query(ProjectLike.project_id, func.count(ProjectLike.id).label("cnt"))
+        .filter(ProjectLike.project_id.in_(project_ids))
+        .group_by(ProjectLike.project_id)
+        .all()
+    }
+    # Batch-fetch comment counts
+    comment_counts = {
+        row.project_id: row.cnt
+        for row in db.query(ProjectComment.project_id, func.count(ProjectComment.id).label("cnt"))
+        .filter(ProjectComment.project_id.in_(project_ids))
+        .group_by(ProjectComment.project_id)
+        .all()
+    }
+    # Which projects the current user has liked
+    my_likes = {
+        row.project_id
+        for row in db.query(ProjectLike.project_id)
+        .filter(ProjectLike.project_id.in_(project_ids), ProjectLike.user_id == current_user.id)
+        .all()
+    }
+
     return [
         PublicProjectOut(
             id=p.id,
@@ -123,6 +152,9 @@ def explore_projects(
             author_username=p.owner.username,
             author_display_name=p.owner.display_name,
             measurement_count=len(p.measurements),
+            like_count=like_counts.get(p.id, 0),
+            is_liked_by_me=p.id in my_likes,
+            comment_count=comment_counts.get(p.id, 0),
         )
         for p in projects
     ]

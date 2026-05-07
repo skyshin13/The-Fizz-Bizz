@@ -4,7 +4,7 @@ import api from '../lib/api'
 import { PublicProject, PublicUser } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { Search, Users, FlaskConical, UserPlus, UserCheck, Check } from 'lucide-react'
+import { Search, Users, FlaskConical, UserPlus, UserCheck, Check, Heart } from 'lucide-react'
 import styles from './ExplorePage.module.css'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -122,7 +122,18 @@ export default function ExplorePage() {
           ) : (
             <div className={`fade-in-delay-2 ${styles.grid}`}>
               {filteredProjects.map(p => (
-                <PublicProjectCard key={p.id} project={p} getEmoji={getEmoji} />
+                <PublicProjectCard
+                  key={p.id}
+                  project={p}
+                  getEmoji={getEmoji}
+                  onLikeToggle={(id, liked) => {
+                    setProjects(prev => prev.map(proj =>
+                      proj.id === id
+                        ? { ...proj, is_liked_by_me: liked, like_count: proj.like_count + (liked ? 1 : -1) }
+                        : proj
+                    ))
+                  }}
+                />
               ))}
             </div>
           )}
@@ -215,7 +226,26 @@ export default function ExplorePage() {
   )
 }
 
-function PublicProjectCard({ project, getEmoji }: { project: PublicProject; getEmoji: (type: string) => string }) {
+function PublicProjectCard({ project, getEmoji, onLikeToggle }: {
+  project: PublicProject
+  getEmoji: (type: string) => string
+  onLikeToggle: (id: number, liked: boolean) => void
+}) {
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      if (project.is_liked_by_me) {
+        await api.delete(`/projects/${project.id}/like`)
+      } else {
+        await api.post(`/projects/${project.id}/like`)
+      }
+      onLikeToggle(project.id, !project.is_liked_by_me)
+    } catch {
+      toast.error('Failed to update like')
+    }
+  }
+
   return (
     <Link to={`/projects/${project.id}/view`} style={{ display: 'block', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', transition: 'box-shadow 0.2s' }}>
       {project.cover_photo_url ? (
@@ -226,20 +256,17 @@ function PublicProjectCard({ project, getEmoji }: { project: PublicProject; getE
         </div>
       )}
       <div style={{ padding: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem', marginBottom: '0.5rem' }}>
-          {!project.cover_photo_url && null}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ fontSize: '0.925rem', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</h3>
-            {project.description && (
-              <p style={{ fontSize: '0.775rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.description}</p>
-            )}
-          </div>
+        <div style={{ flex: 1, minWidth: 0, marginBottom: '0.5rem' }}>
+          <h3 style={{ fontSize: '0.925rem', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</h3>
+          {project.description && (
+            <p style={{ fontSize: '0.775rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.description}</p>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.625rem' }}>
           <span>by <strong style={{ color: 'var(--text-secondary)' }}>@{project.author_username}</strong></span>
           <span>{formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.625rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <span style={{ fontSize: '1.1rem' }}>{getEmoji(project.fermentation_type)}</span>
           <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '20px', background: project.status === 'active' ? '#4a674118' : '#3d4e5c18', color: project.status === 'active' ? 'var(--moss)' : 'var(--slate)' }}>
             {project.status}
@@ -247,6 +274,26 @@ function PublicProjectCard({ project, getEmoji }: { project: PublicProject; getE
           {project.measurement_count > 0 && (
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{project.measurement_count} readings</span>
           )}
+        </div>
+        {/* Like & comment bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.625rem', borderTop: '1px solid var(--border-light)' }}>
+          <button
+            onClick={handleLike}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              background: 'none', padding: '0.25rem 0.5rem', borderRadius: '20px',
+              color: project.is_liked_by_me ? '#e05252' : 'var(--text-muted)',
+              fontSize: '0.8rem', fontWeight: 600,
+              border: `1px solid ${project.is_liked_by_me ? '#e0525240' : 'var(--border-light)'}`,
+              transition: 'all 0.15s',
+            }}
+          >
+            <Heart size={14} fill={project.is_liked_by_me ? '#e05252' : 'none'} />
+            {project.like_count}
+          </button>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, letterSpacing: '0.04em' }}>
+            COMMENTS {project.comment_count}
+          </span>
         </div>
       </div>
     </Link>
