@@ -1018,6 +1018,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const [releasing, setReleasing] = useState(false)
   const [patching, setPatching]   = useState(false)
   const initialised               = useRef(false)
+  const fetchDataRef              = useRef<() => Promise<LiveCERState | null>>(() => Promise.resolve(null))
 
   // Zoom window: 'all' or last-N-hours
   const [viewHours, setViewHours]       = useState<number | 'all'>('all')
@@ -1112,12 +1113,20 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
     }
   }, [liveState?.strain_id, strains])
 
-  // Poll every 60 s — matches backend tick interval
+  // Keep ref pointing at the latest fetchData (avoids stale closures in the interval)
+  useEffect(() => { fetchDataRef.current = fetchData })
+
+  // Initial fetch on mount
   useEffect(() => {
-    fetchData()
-    const timerId = window.setInterval(fetchData, 60000)
-    return () => window.clearInterval(timerId)
+    fetchDataRef.current()
   }, [projectId])
+
+  // Poll at backend tick rate — restarts whenever intervalSecs changes
+  useEffect(() => {
+    const ms = (parseInt(intervalSecs) || 30) * 1000
+    const timerId = window.setInterval(() => fetchDataRef.current(), ms)
+    return () => window.clearInterval(timerId)
+  }, [projectId, intervalSecs])
 
   // ── Send updated params to backend ─────────────────────────────────────────
   const patchParams = async (overrides?: { strain_id?: string; interval_seconds?: number }) => {
@@ -1182,6 +1191,11 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
 
   // X-axis offset: use minH directly so zoomed labels always read 0 → windowH
   const xOffset = windowH !== null ? minH : 0
+
+  // Fixed domain in window mode so graph fills the full requested width and
+  // slides forward as new data arrives (right edge = latest point's hour).
+  const xDomain: [number, number] | ['dataMin', 'dataMax'] =
+    windowH !== null ? [minH, minH + windowH] : ['dataMin', 'dataMax']
 
   // Explicit integer ticks — avoids duplicate labels from tickCount rounding
   const xTicks = useMemo(() => {
@@ -1418,7 +1432,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                 <XAxis
                   dataKey="hours_elapsed"
                   type="number"
-                  domain={['dataMin', 'dataMax']}
+                  domain={xDomain}
                   ticks={xTicks}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
                   label={{ value: windowH !== null ? `Last ${windowH.toFixed(0)}h` : 'Hours since start', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
