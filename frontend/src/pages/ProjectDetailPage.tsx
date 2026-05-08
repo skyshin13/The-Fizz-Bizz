@@ -1006,7 +1006,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const [sugar, setSugar]         = useState(String(Math.round(_sugar)))
   const [volume, setVolume]       = useState(String(Math.round(_vol * 10) / 10))
   const [temp, setTemp]           = useState(String(Math.round(_tempF * 10) / 10))
-  const [threshold, setThreshold]   = useState('1500')  // CER alert in mg/L/h (frontend-only)
+  const [threshold, setThreshold]   = useState('10')  // PSI alert threshold (frontend-only)
   const [intervalSecs, setIntervalSecs] = useState('30')   // tick interval in seconds
 
   // Live data from the database
@@ -1015,6 +1015,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const [simCurve, setSimCurve]   = useState<{ hours_elapsed: number; predicted_psi: number }[]>([])
   const [loading, setLoading]     = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [now, setNow]             = useState(Date.now())
   const [releasing, setReleasing] = useState(false)
   const [patching, setPatching]   = useState(false)
   const initialised               = useRef(false)
@@ -1128,6 +1129,12 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
     return () => window.clearInterval(timerId)
   }, [projectId, intervalSecs])
 
+  // Tick every second so "Updated Xs ago" stays accurate
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(t)
+  }, [])
+
   // ── Send updated params to backend ─────────────────────────────────────────
   const patchParams = async (overrides?: { strain_id?: string; interval_seconds?: number }) => {
     setPatching(true)
@@ -1161,9 +1168,9 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   }
 
   // Derived values
-  const alertNum      = parseFloat(threshold) || 1500
-  const isAlerting    = (liveState?.current_cer_estimate ?? 0) > alertNum
-  const secsSincePoll = lastUpdated ? Math.round((Date.now() - lastUpdated.getTime()) / 1000) : null
+  const alertNum      = parseFloat(threshold) || 10
+  const isAlerting    = (liveState?.current_psi ?? 0) > alertNum
+  const secsSincePoll = lastUpdated ? Math.round((now - lastUpdated.getTime()) / 1000) : null
 
   // Zoom: slice points to the selected window
   const maxH = points.length > 0 ? points[points.length - 1].hours_elapsed : 0
@@ -1295,8 +1302,8 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
           <input type="number" step="1" value={temp} onChange={e => setTemp(e.target.value)} onBlur={() => patchParams()} style={cerInput} />
         </div>
         <div>
-          <label style={cerLabel}>CER Alert (mg/L/h)</label>
-          <input type="number" step="10" value={threshold} onChange={e => setThreshold(e.target.value)} style={cerInput} />
+          <label style={cerLabel}>PSI Alert Threshold</label>
+          <input type="number" step="0.5" value={threshold} onChange={e => setThreshold(e.target.value)} style={cerInput} />
         </div>
 
         <div>
@@ -1344,7 +1351,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
             <AlertTriangle size={16} style={{ flexShrink: 0 }} />
             <div>
               <strong style={{ fontSize: '0.875rem' }}>Pressure Alert</strong>
-              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>CER is {liveState!.current_cer_estimate.toFixed(1)} mg/L/h — above your {threshold} threshold. Release CO₂ from your jar.</p>
+              <p style={{ fontSize: '0.78rem', margin: 0, opacity: 0.85 }}>Pressure is {liveState!.current_psi.toFixed(2)} PSI — above your {threshold} PSI threshold. Release CO₂ from your jar.</p>
             </div>
           </div>
         )}
@@ -1491,8 +1498,8 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
         {liveState && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
             {[
-              { label: 'Current PSI',  value: liveState.current_psi.toFixed(3),              unit: 'vessel pressure' },
-              { label: 'CER estimate', value: liveState.current_cer_estimate.toFixed(1),     unit: 'mg/L/h now' },
+              { label: 'Current PSI',  value: liveState.current_psi.toFixed(2),              unit: 'vessel pressure' },
+              { label: 'CO₂ Rate',     value: liveState.current_cer_estimate.toFixed(1),     unit: 'mg/L/h activity' },
               { label: 'Elapsed',      value: `${liveState.elapsed_hours.toFixed(1)}h`,      unit: `${liveState.current_phase} phase` },
             ].map(({ label, value, unit }) => (
               <div key={label} style={{ padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
