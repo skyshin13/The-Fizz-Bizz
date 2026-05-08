@@ -1196,43 +1196,26 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
     return Array.from(map.values()).sort((a, b) => a.hours_elapsed - b.hours_elapsed)
   }, [visiblePoints, simCurve, windowH, minH])
 
-  // X-axis offset: use minH directly so zoomed labels always read 0 → windowH
-  const xOffset = windowH !== null ? minH : 0
+  // Function-based domain pins exact bounds regardless of data extent.
+  const xDomain = windowH !== null
+    ? [() => minH, () => minH + windowH]
+    : ['dataMin', 'dataMax']
 
-  // Fixed domain in window mode so graph fills the full requested width and
-  // slides forward as new data arrives (right edge = latest point's hour).
-  const xDomain: [number, number] | ['dataMin', 'dataMax'] =
-    windowH !== null ? [minH, minH + windowH] : ['dataMin', 'dataMax']
-
-  // Ticks covering the full domain, including both edges
+  // Explicit tick list avoids Recharts rounding duplicates.
+  // Sub-hour: 5 evenly spaced ticks (relative labels in minutes).
+  // Hour-scale: one tick per integer hour within the window (absolute labels).
   const xTicks = useMemo(() => {
-    const rangeH = windowH !== null ? windowH : maxH
-    if (rangeH <= 0) return [0]
-    const step = rangeH <= 0.5 ? 0.25        // 15-min steps for ≤30 min
-               : rangeH <= 2   ? 0.5         // 30-min steps for ≤2 h
-               : rangeH <= 6   ? 1
-               : rangeH <= 12  ? 2
-               : rangeH <= 24  ? 4
-               : rangeH <= 48  ? 8
-               : rangeH <= 96  ? 12 : 24
-    const domainStart = xOffset
-    const domainEnd   = xOffset + rangeH
+    if (windowH === null) return undefined
+    if (windowH < 1) {
+      const step = windowH / 4
+      return [0, 1, 2, 3, 4].map(i => minH + step * i)
+    }
+    const startH = Math.ceil(minH)
+    const endH = Math.floor(minH + windowH)
     const ticks: number[] = []
-    // First tick aligned to step grid
-    const startI = Math.ceil(domainStart / step) * step
-    for (let t = startI; t <= domainEnd + step * 0.01; t += step) {
-      ticks.push(parseFloat(t.toFixed(6)))
-    }
-    // Always include the left boundary (shows "0h" / "0m")
-    if (ticks.length === 0 || ticks[0] > domainStart + step * 0.01) {
-      ticks.unshift(parseFloat(domainStart.toFixed(6)))
-    }
-    // Always include the right boundary so the axis label reaches the far edge
-    if (ticks[ticks.length - 1] < domainEnd - step * 0.01) {
-      ticks.push(parseFloat(domainEnd.toFixed(6)))
-    }
+    for (let h = startH; h <= endH; h++) ticks.push(h)
     return ticks
-  }, [windowH, maxH, xOffset])
+  }, [minH, windowH])
 
   const filtered = strains.filter(s =>
     s.name.toLowerCase().includes(strainSearch.toLowerCase()) ||
@@ -1456,16 +1439,15 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                 <XAxis
                   dataKey="hours_elapsed"
                   type="number"
-                  domain={xDomain}
+                  domain={xDomain as any}
                   ticks={xTicks}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
                   label={{ value: windowH !== null ? (windowH < 1 ? `Last ${Math.round(windowH * 60)}m` : `Last ${windowH % 1 === 0 ? windowH.toFixed(0) : windowH}h`) : 'Hours since start', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
                   tickFormatter={(v: number) => {
-                    const relH = v - xOffset
-                    if (windowH !== null && windowH < 2) {
-                      return `${Math.round(relH * 60)}m`
+                    if (windowH !== null && windowH < 1) {
+                      return `${Math.round((v - minH) * 60)}m`
                     }
-                    return `${Math.round(relH)}h`
+                    return `${Math.round(v)}h`
                   }}
                 />
                 <YAxis
