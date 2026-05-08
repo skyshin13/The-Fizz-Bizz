@@ -1182,7 +1182,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const mergedChartData = useMemo(() => {
     const visibleSim = windowH !== null
       ? simCurve.filter(p => p.hours_elapsed >= minH && p.hours_elapsed <= maxH + windowH)
-      : simCurve
+      : simCurve.filter(p => p.hours_elapsed <= maxH)
     const map = new Map<string, { hours_elapsed: number; co2_psi?: number; predicted_psi?: number }>()
     for (const p of visiblePoints) {
       map.set(p.hours_elapsed.toFixed(3), { hours_elapsed: p.hours_elapsed, co2_psi: p.co2_psi })
