@@ -67,7 +67,11 @@ def create_reminder(
     if body.sms_enabled and not phone:
         raise HTTPException(400, "A phone number is required to enable SMS reminders. Add one in your profile.")
 
-    next_trigger = datetime.now(timezone.utc) + timedelta(hours=body.interval_hours)
+    # co2_limit uses interval_hours as a PSI threshold, not a time interval
+    if body.reminder_type == 'co2_limit':
+        next_trigger = None
+    else:
+        next_trigger = datetime.now(timezone.utc) + timedelta(hours=body.interval_hours)
 
     reminder = Reminder(
         project_id=project_id,

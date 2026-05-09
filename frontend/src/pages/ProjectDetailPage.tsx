@@ -641,7 +641,7 @@ export default function ProjectDetailPage() {
         {activeTab === 'reminders' && (
           <div style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 600 }}>Active Reminders</h3>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 600 }}>Reminders</h3>
               <button onClick={() => setShowReminder(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.875rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
                 <Bell size={13} /> Add Reminder
               </button>
@@ -1576,8 +1576,10 @@ function ReminderCard({ reminder, onDelete, onToggle, onEdit, onSendNow }: { rem
         </div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>{reminder.message}</p>
         <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          {friendlyInterval(reminder.interval_hours)}
-          {reminder.is_active && reminder.next_trigger_at && ` · Next: ${format(parseISO(reminder.next_trigger_at), 'MMM d, h:mm a')}`}
+          {reminder.reminder_type === 'co2_limit'
+            ? `Alert when CO₂ reaches ${reminder.interval_hours} PSI`
+            : friendlyInterval(reminder.interval_hours)}
+          {reminder.reminder_type !== 'co2_limit' && reminder.is_active && reminder.next_trigger_at && ` · Next: ${format(parseISO(reminder.next_trigger_at), 'MMM d, h:mm a')}`}
         </p>
       </div>
       <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
@@ -1608,12 +1610,13 @@ function hoursToUnit(hours: number): { count: string; unit: 'day' | 'week' | 'mo
 
 function ReminderModal({ projectId, existing, onClose, onAdded }: { projectId: number; existing?: Reminder | null; onClose: () => void; onAdded: () => void }) {
   const { user } = useAuth()
+  const isCO2 = (type: string) => type === 'co2_limit'
 
   const PRESET_TYPES = [
     { value: 'ph_check',        label: '🧪 Log pH',              defaultMsg: 'Time to check and log the pH on your fermentation!',           defaultCount: '2', defaultUnit: 'day'  as const },
     { value: 'gravity_check',   label: '⚗️ Log Gravity (SG)',    defaultMsg: 'Time to take and log a specific gravity reading!',              defaultCount: '3', defaultUnit: 'day'  as const },
     { value: 'co2_release',     label: '💨 CO₂ Release',         defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!',      defaultCount: '1', defaultUnit: 'day'  as const },
-    { value: 'co2_limit',       label: '💥 CO₂ PSI Check',       defaultMsg: 'CO₂ pressure alert! Check your vessel PSI and vent if needed.', defaultCount: '12', defaultUnit: 'day' as const },
+    { value: 'co2_limit',       label: '💥 CO₂ PSI Alert',       defaultMsg: 'CO₂ pressure alert! Check your vessel PSI and vent if needed.', defaultCount: '10', defaultUnit: 'day' as const },
     { value: 'look_at_project', label: '👀 Check on Project',    defaultMsg: 'Time to check on your fermentation — observe aroma, color, and activity!', defaultCount: '1', defaultUnit: 'day' as const },
     { value: 'custom',          label: '⏰ Custom',               defaultMsg: 'Time to check on your fermentation!',                         defaultCount: '2', defaultUnit: 'day'  as const },
   ]
@@ -1621,9 +1624,12 @@ function ReminderModal({ projectId, existing, onClose, onAdded }: { projectId: n
   const UNIT_HOURS = { day: 24, week: 168, month: 720 }
 
   const initFromExisting = () => {
-    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false }
+    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, psi_threshold: '10' }
+    if (existing.reminder_type === 'co2_limit') {
+      return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, psi_threshold: String(existing.interval_hours) }
+    }
     const { count, unit } = hoursToUnit(existing.interval_hours)
-    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled }
+    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, psi_threshold: '10' }
   }
 
   const [form, setForm] = useState(initFromExisting)
@@ -1642,7 +1648,9 @@ function ReminderModal({ projectId, existing, onClose, onAdded }: { projectId: n
     setLoading(true)
     try {
       const preset = PRESET_TYPES.find(p => p.value === form.reminder_type)!
-      const interval_hours = Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]
+      const interval_hours = isCO2(form.reminder_type)
+        ? Math.max(1, parseInt(form.psi_threshold) || 10)
+        : Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]
       if (existing) {
         await api.patch(`/reminders/${existing.id}`, {
           interval_hours,
@@ -1695,32 +1703,52 @@ function ReminderModal({ projectId, existing, onClose, onAdded }: { projectId: n
           </div>
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={lStyle}>Repeat Every</label>
-          <div style={{ display: 'flex', gap: '0.625rem' }}>
-            <select
-              value={form.interval_count}
-              onChange={e => setForm(prev => ({ ...prev, interval_count: e.target.value }))}
-              style={{ ...iStyle, flex: '0 0 auto', width: '90px', cursor: 'pointer' }}
-            >
-              {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
-                <option key={n} value={String(n)}>{n}</option>
-              ))}
-            </select>
-            <select
-              value={form.interval_unit}
-              onChange={e => setForm(prev => ({ ...prev, interval_unit: e.target.value as 'day' | 'week' | 'month' }))}
-              style={{ ...iStyle, flex: 1, cursor: 'pointer' }}
-            >
-              <option value="day">{parseInt(form.interval_count) === 1 ? 'Day' : 'Days'}</option>
-              <option value="week">{parseInt(form.interval_count) === 1 ? 'Week' : 'Weeks'}</option>
-              <option value="month">{parseInt(form.interval_count) === 1 ? 'Month' : 'Months'}</option>
-            </select>
+        {isCO2(form.reminder_type) ? (
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={lStyle}>Alert when CO₂ reaches (PSI)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={form.psi_threshold}
+                onChange={e => setForm(prev => ({ ...prev, psi_threshold: e.target.value }))}
+                style={{ ...iStyle, width: '100px', flex: '0 0 auto' }}
+              />
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>PSI</span>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
+              You'll get an SMS whenever a CO₂ PSI reading meets or exceeds this value. Alerts repeat at most once every 4 hours.
+            </p>
           </div>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-            Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; {Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hours
-          </p>
-        </div>
+        ) : (
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={lStyle}>Repeat Every</label>
+            <div style={{ display: 'flex', gap: '0.625rem' }}>
+              <select
+                value={form.interval_count}
+                onChange={e => setForm(prev => ({ ...prev, interval_count: e.target.value }))}
+                style={{ ...iStyle, flex: '0 0 auto', width: '90px', cursor: 'pointer' }}
+              >
+                {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
+                  <option key={n} value={String(n)}>{n}</option>
+                ))}
+              </select>
+              <select
+                value={form.interval_unit}
+                onChange={e => setForm(prev => ({ ...prev, interval_unit: e.target.value as 'day' | 'week' | 'month' }))}
+                style={{ ...iStyle, flex: 1, cursor: 'pointer' }}
+              >
+                <option value="day">{parseInt(form.interval_count) === 1 ? 'Day' : 'Days'}</option>
+                <option value="week">{parseInt(form.interval_count) === 1 ? 'Week' : 'Weeks'}</option>
+                <option value="month">{parseInt(form.interval_count) === 1 ? 'Month' : 'Months'}</option>
+              </select>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
+              Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; {Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hours
+            </p>
+          </div>
+        )}
 
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer', marginBottom: '1.5rem' }}>
           <input

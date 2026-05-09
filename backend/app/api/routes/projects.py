@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from typing import List
+from datetime import datetime, timedelta, timezone
 from app.db.database import get_db
+from app.services.twilio_service import send_sms
 from app.models.models import (
     FermentationProject, MeasurementLog, ObservationNote, ProjectPhoto,
     Reminder, User, ProjectYeastConnection, YeastProfile, ProjectCERState,
@@ -301,6 +303,32 @@ def add_measurement(
     db.add(measurement)
     db.commit()
     db.refresh(measurement)
+
+    # Check CO2 PSI alert reminders when a co2_psi reading is logged
+    if body.co2_psi is not None:
+        now = datetime.now(timezone.utc)
+        co2_alerts = db.query(Reminder).filter(
+            Reminder.project_id == project_id,
+            Reminder.reminder_type == 'co2_limit',
+            Reminder.is_active == True,
+            Reminder.sms_enabled == True,
+        ).all()
+        for alert in co2_alerts:
+            threshold_psi = alert.interval_hours  # stores PSI threshold for co2_limit type
+            triggered_at = alert.next_trigger_at
+            if triggered_at and triggered_at.replace(tzinfo=timezone.utc) > now:
+                continue  # still in cooldown
+            if body.co2_psi >= threshold_psi:
+                phone = alert.phone_number or current_user.phone_number
+                if phone:
+                    send_sms(phone, (
+                        f'Fizz Bizz CO₂ alert for "{project.name}": '
+                        f'PSI reading of {body.co2_psi:.1f} has reached your alert threshold of '
+                        f'{threshold_psi} PSI. Consider venting your vessel.'
+                    ))
+                alert.next_trigger_at = now + timedelta(hours=4)
+        db.commit()
+
     return measurement
 
 
