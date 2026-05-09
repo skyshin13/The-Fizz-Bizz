@@ -345,7 +345,7 @@ function CreateProjectModal({ types, onClose, onCreated }: { types: { value: str
 
             <Field label="Fermentation Type *">
               <select required value={form.fermentation_type} onChange={set('fermentation_type')} style={iStyle}>
-                {types.filter(t => !['water_kefir', 'cider'].includes(t.value)).map(t => (
+                {types.filter(t => !['cider'].includes(t.value)).map(t => (
                   <option key={t.value} value={t.value}>
                     {t.emoji ? `${t.emoji} ${t.label}` : t.label}
                   </option>
