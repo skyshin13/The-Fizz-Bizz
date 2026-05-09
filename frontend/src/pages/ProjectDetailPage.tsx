@@ -543,7 +543,7 @@ export default function ProjectDetailPage() {
       )}
 
       {hasCer && (
-        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', marginBottom: '2rem' }}>
           <div style={{ borderBottom: '1px solid var(--border-light)', padding: '0.875rem 1.5rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
             CO₂ Production
           </div>
@@ -565,7 +565,7 @@ export default function ProjectDetailPage() {
       )}
 
       {hasKefirCO2 && (
-        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', marginBottom: '2rem' }}>
           <div style={{ borderBottom: '1px solid var(--border-light)', padding: '0.875rem 1.5rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
             CO₂ Dynamics
           </div>
