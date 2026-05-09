@@ -26,6 +26,7 @@ export default function ProjectDetailPage() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [showReminder, setShowReminder] = useState(false)
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
+  const [cerThreshold, setCerThreshold] = useState('10')
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
@@ -448,7 +449,7 @@ export default function ProjectDetailPage() {
               color: 'var(--rust)',
             },
           ] : []),
-          { label: 'Temp (°F)', value: latestM?.temperature_celsius != null ? String(toF(latestM.temperature_celsius)) : undefined, icon: Thermometer, color: 'var(--slate)' },
+          { label: 'Temp (°F)', value: (latestM?.temperature_celsius ?? project.fermentation_temp_celsius) != null ? `${toF(latestM?.temperature_celsius ?? project.fermentation_temp_celsius!)}°` : undefined, icon: Thermometer, color: 'var(--slate)' },
         ]
         return (
       <div className={`fade-in-delay-1 ${styles.statsGrid}`} style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
@@ -678,6 +679,8 @@ export default function ProjectDetailPage() {
               fermentationTempCelsius={project.fermentation_temp_celsius}
               sugarAmountGrams={project.sugar_amount_grams}
               yeastStrain={project.yeast_strain}
+              threshold={cerThreshold}
+              onThresholdChange={setCerThreshold}
             />
           </div>
         )}
@@ -726,8 +729,8 @@ export default function ProjectDetailPage() {
 
       {showMeasure && <MeasurementModal projectId={project.id} isAlcohol={isAlcohol} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
       {showNote && <NoteModal projectId={project.id} onClose={() => setShowNote(false)} onAdded={() => { setShowNote(false); load() }} />}
-      {showReminder && <ReminderModal projectId={project.id} onClose={() => setShowReminder(false)} onAdded={() => { setShowReminder(false); loadReminders() }} />}
-      {editingReminder && <ReminderModal projectId={project.id} existing={editingReminder} onClose={() => setEditingReminder(null)} onAdded={() => { setEditingReminder(null); loadReminders() }} />}
+      {showReminder && <ReminderModal projectId={project.id} cerThreshold={cerThreshold} onClose={() => setShowReminder(false)} onAdded={() => { setShowReminder(false); loadReminders() }} />}
+      {editingReminder && <ReminderModal projectId={project.id} existing={editingReminder} cerThreshold={cerThreshold} onClose={() => setEditingReminder(null)} onAdded={() => { setEditingReminder(null); loadReminders() }} />}
       {showComplete && (
         <CompleteProjectModal
           project={project}
@@ -1013,7 +1016,7 @@ const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59
 const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
 const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
 
-function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams, yeastStrain }: {
+function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams, yeastStrain, threshold, onThresholdChange }: {
   projectId: number
   startDate?: string
   initialGravity?: number
@@ -1021,6 +1024,8 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   fermentationTempCelsius?: number
   sugarAmountGrams?: number
   yeastStrain?: { name?: string; strain_code?: string; yeast_type?: string } | null
+  threshold: string
+  onThresholdChange: (v: string) => void
 }) {
   const [strains, setStrains]           = useState<CERStrain[]>([])
   const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
@@ -1055,7 +1060,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const [sugar, setSugar]         = useState(String(Math.round(_sugar)))
   const [volume, setVolume]       = useState(String(Math.round(_vol * 10) / 10))
   const [temp, setTemp]           = useState(String(Math.round(_tempF * 10) / 10))
-  const [threshold, setThreshold]   = useState('10')  // PSI alert threshold (frontend-only)
+  // threshold / onThresholdChange come from parent (ProjectDetailPage) so the reminder modal can read them
   const [intervalSecs, setIntervalSecs] = useState('30')   // tick interval in seconds
 
   // Live data from the database
@@ -1335,7 +1340,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
         </div>
         <div>
           <label style={cerLabel}>PSI Alert Threshold</label>
-          <input type="number" step="0.5" value={threshold} onChange={e => setThreshold(e.target.value)} style={cerInput} />
+          <input type="number" step="0.5" value={threshold} onChange={e => onThresholdChange(e.target.value)} style={cerInput} />
         </div>
 
         <div>
@@ -1574,8 +1579,7 @@ function ReminderCard({ reminder, onDelete, onToggle, onEdit, onSendNow }: { rem
             </span>
           ) : null}
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>{reminder.message}</p>
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.125rem' }}>
           {reminder.reminder_type === 'co2_limit'
             ? `Alert when CO₂ reaches ${reminder.interval_hours} PSI`
             : friendlyInterval(reminder.interval_hours)}
@@ -1608,28 +1612,27 @@ function hoursToUnit(hours: number): { count: string; unit: 'day' | 'week' | 'mo
   return { count: String(Math.round(hours / 24) || 1), unit: 'day' }
 }
 
-function ReminderModal({ projectId, existing, onClose, onAdded }: { projectId: number; existing?: Reminder | null; onClose: () => void; onAdded: () => void }) {
+function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: { projectId: number; existing?: Reminder | null; cerThreshold?: string; onClose: () => void; onAdded: () => void }) {
   const { user } = useAuth()
   const isCO2 = (type: string) => type === 'co2_limit'
 
   const PRESET_TYPES = [
     { value: 'ph_check',        label: '🧪 Log pH',              defaultMsg: 'Time to check and log the pH on your fermentation!',           defaultCount: '2', defaultUnit: 'day'  as const },
     { value: 'gravity_check',   label: '⚗️ Log Gravity (SG)',    defaultMsg: 'Time to take and log a specific gravity reading!',              defaultCount: '3', defaultUnit: 'day'  as const },
-    { value: 'co2_release',     label: '💨 CO₂ Release',         defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!',      defaultCount: '1', defaultUnit: 'day'  as const },
     { value: 'co2_limit',       label: '💥 CO₂ PSI Alert',       defaultMsg: 'CO₂ pressure alert! Check your vessel PSI and vent if needed.', defaultCount: '10', defaultUnit: 'day' as const },
     { value: 'look_at_project', label: '👀 Check on Project',    defaultMsg: 'Time to check on your fermentation — observe aroma, color, and activity!', defaultCount: '1', defaultUnit: 'day' as const },
-    { value: 'custom',          label: '⏰ Custom',               defaultMsg: 'Time to check on your fermentation!',                         defaultCount: '2', defaultUnit: 'day'  as const },
   ]
 
   const UNIT_HOURS = { day: 24, week: 168, month: 720 }
 
   const initFromExisting = () => {
-    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, psi_threshold: '10' }
+    const defaultPsi = cerThreshold || '10'
+    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, psi_threshold: defaultPsi }
     if (existing.reminder_type === 'co2_limit') {
       return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, psi_threshold: String(existing.interval_hours) }
     }
     const { count, unit } = hoursToUnit(existing.interval_hours)
-    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, psi_threshold: '10' }
+    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, psi_threshold: defaultPsi }
   }
 
   const [form, setForm] = useState(initFromExisting)
