@@ -22,7 +22,7 @@ export default function ProjectDetailPage() {
   const [showNote, setShowNote] = useState(false)
   const [showComplete, setShowComplete] = useState(false)
   const [activeChart, setActiveChart] = useState<'ph' | 'gravity'>('ph')
-  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'cer'>('log')
+  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'cer' | 'reminders'>('log')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [showReminder, setShowReminder] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -41,6 +41,18 @@ export default function ProjectDetailPage() {
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
   const loadReminders = () => api.get(`/projects/${id}/reminders`).then(r => setReminders(r.data)).catch(() => {})
+  const deleteReminder = async (reminderId: number) => {
+    await api.delete(`/reminders/${reminderId}`)
+    loadReminders()
+  }
+  const sendReminderNow = async (reminderId: number) => {
+    try {
+      await api.post(`/reminders/${reminderId}/send`)
+      toast.success('SMS sent!')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to send SMS')
+    }
+  }
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -538,8 +550,9 @@ export default function ProjectDetailPage() {
             ['log', 'Notes & Log'],
             ['album', `Album (${photos.length})`],
             ...(hasCer ? [['cer', 'CO₂ Production']] : []),
+            ['reminders', `Reminders${reminders.length ? ` (${reminders.length})` : ''}`],
           ] as const).map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab as 'log' | 'album' | 'cer')} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
+            <button key={tab} onClick={() => setActiveTab(tab as 'log' | 'album' | 'cer' | 'reminders')} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
               {label}
             </button>
           ))}
@@ -614,6 +627,34 @@ export default function ProjectDetailPage() {
                       <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{format(parseISO(obs.created_at), 'MMM d, yyyy')}</p>
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'reminders' && (
+          <div style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 600 }}>Active Reminders</h3>
+              <button onClick={() => setShowReminder(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.875rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
+                <Bell size={13} /> Add Reminder
+              </button>
+            </div>
+            {reminders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <Bell size={32} style={{ marginBottom: '0.75rem', opacity: 0.3 }} />
+                <p style={{ fontSize: '0.875rem' }}>No reminders set. Add one to stay on top of your fermentation.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                {reminders.map(r => (
+                  <ReminderCard
+                    key={r.id}
+                    reminder={r}
+                    onDelete={() => deleteReminder(r.id)}
+                    onSendNow={() => sendReminderNow(r.id)}
+                  />
                 ))}
               </div>
             )}
@@ -1499,9 +1540,11 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
 
 function ReminderCard({ reminder, onDelete, onSendNow }: { reminder: Reminder; onDelete: () => void; onSendNow: () => void }) {
   const typeLabels: Record<string, string> = {
-    ph_check: '🧪 pH Check',
+    ph_check: '🧪 Log pH',
+    gravity_check: '⚗️ Log Gravity (SG)',
     co2_release: '💨 CO₂ Release',
-    gravity_check: '⚗️ Gravity Check',
+    co2_limit: '💥 CO₂ PSI Check',
+    look_at_project: '👀 Check on Project',
     taste: '👅 Taste Test',
     custom: '⏰ Custom',
   }
@@ -1560,10 +1603,12 @@ function ReminderModal({ projectId, onClose, onAdded }: { projectId: number; onC
   const [loading, setLoading] = useState(false)
 
   const PRESET_TYPES = [
-    { value: 'ph_check',      label: '🧪 pH Check',           defaultMsg: 'Time to check the pH on your fermentation!',             defaultCount: '2', defaultUnit: 'day'  as const },
-    { value: 'co2_release',   label: '💨 CO₂ Release (Burp)', defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!', defaultCount: '1', defaultUnit: 'day'  as const },
-    { value: 'gravity_check', label: '⚗️ Gravity Check',      defaultMsg: 'Time to take a gravity reading!',                         defaultCount: '3', defaultUnit: 'day'  as const },
-    { value: 'custom',        label: '⏰ Custom',               defaultMsg: 'Time to check on your fermentation!',                    defaultCount: '2', defaultUnit: 'day'  as const },
+    { value: 'ph_check',        label: '🧪 Log pH',              defaultMsg: 'Time to check and log the pH on your fermentation!',          defaultCount: '2', defaultUnit: 'day'  as const },
+    { value: 'gravity_check',   label: '⚗️ Log Gravity (SG)',    defaultMsg: 'Time to take and log a specific gravity reading!',             defaultCount: '3', defaultUnit: 'day'  as const },
+    { value: 'co2_release',     label: '💨 CO₂ Release (Burp)',  defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!',     defaultCount: '1', defaultUnit: 'day'  as const },
+    { value: 'co2_limit',       label: '💥 CO₂ PSI Check',       defaultMsg: 'CO₂ pressure alert! Check your vessel PSI and vent if needed.', defaultCount: '12', defaultUnit: 'day' as const },
+    { value: 'look_at_project', label: '👀 Check on Project',    defaultMsg: 'Time to check on your fermentation — observe aroma, color, and activity!', defaultCount: '1', defaultUnit: 'day' as const },
+    { value: 'custom',          label: '⏰ Custom',               defaultMsg: 'Time to check on your fermentation!',                        defaultCount: '2', defaultUnit: 'day'  as const },
   ]
 
   const UNIT_HOURS = { day: 24, week: 168, month: 720 }

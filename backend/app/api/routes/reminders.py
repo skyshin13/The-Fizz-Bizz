@@ -20,10 +20,12 @@ class ReminderUpdate(BaseModel):
 router = APIRouter(tags=["Reminders"])
 
 REMINDER_MESSAGES = {
-    "ph_check": "🧪 Time to check the pH on your fermentation project! Log your reading to track progress.",
+    "ph_check": "🧪 Time to check the pH on your fermentation! Log your reading to track progress.",
+    "gravity_check": "⚗️ Time to take a gravity (SG) reading on your fermentation!",
     "co2_release": "💨 Time to burp/release CO₂ from your fermentation vessel to prevent pressure buildup.",
-    "gravity_check": "⚗️ Time to take a gravity reading on your fermentation project!",
-    "taste": "👅 Time for a taste test on your fermentation project!",
+    "co2_limit": "💥 CO₂ pressure alert! Check your fermentation vessel's PSI and consider venting if needed.",
+    "look_at_project": "👀 Time to check on your fermentation — observe any changes in aroma, color, or activity.",
+    "taste": "👅 Time for a taste test on your fermentation!",
     "custom": "⏰ Reminder for your fermentation project.",
 }
 
