@@ -196,6 +196,12 @@ def update_project(
         updates['visibility'] = 'everyone' if updates['is_public'] else 'private'
     for field, value in updates.items():
         setattr(project, field, value)
+    # Auto-deactivate all reminders when project is completed or failed
+    if updates.get('status') in ('completed', 'failed'):
+        db.query(Reminder).filter(
+            Reminder.project_id == project_id,
+            Reminder.is_active == True,
+        ).update({'is_active': False}, synchronize_session=False)
     db.commit()
     db.refresh(project)
     _attach_yeast_strain(project, db)

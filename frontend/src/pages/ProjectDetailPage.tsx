@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react'
+﻿import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
@@ -25,6 +25,7 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<'log' | 'album' | 'cer' | 'reminders'>('log')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [showReminder, setShowReminder] = useState(false)
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
@@ -43,6 +44,10 @@ export default function ProjectDetailPage() {
   const loadReminders = () => api.get(`/projects/${id}/reminders`).then(r => setReminders(r.data)).catch(() => {})
   const deleteReminder = async (reminderId: number) => {
     await api.delete(`/reminders/${reminderId}`)
+    loadReminders()
+  }
+  const toggleReminderActive = async (reminder: Reminder) => {
+    await api.patch(`/reminders/${reminder.id}`, { is_active: !reminder.is_active })
     loadReminders()
   }
   const sendReminderNow = async (reminderId: number) => {
@@ -653,6 +658,8 @@ export default function ProjectDetailPage() {
                     key={r.id}
                     reminder={r}
                     onDelete={() => deleteReminder(r.id)}
+                    onToggle={() => toggleReminderActive(r)}
+                    onEdit={() => setEditingReminder(r)}
                     onSendNow={() => sendReminderNow(r.id)}
                   />
                 ))}
@@ -720,6 +727,7 @@ export default function ProjectDetailPage() {
       {showMeasure && <MeasurementModal projectId={project.id} isAlcohol={isAlcohol} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
       {showNote && <NoteModal projectId={project.id} onClose={() => setShowNote(false)} onAdded={() => { setShowNote(false); load() }} />}
       {showReminder && <ReminderModal projectId={project.id} onClose={() => setShowReminder(false)} onAdded={() => { setShowReminder(false); loadReminders() }} />}
+      {editingReminder && <ReminderModal projectId={project.id} existing={editingReminder} onClose={() => setEditingReminder(null)} onAdded={() => { setEditingReminder(null); loadReminders() }} />}
       {showComplete && (
         <CompleteProjectModal
           project={project}
@@ -1538,7 +1546,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   )
 }
 
-function ReminderCard({ reminder, onDelete, onSendNow }: { reminder: Reminder; onDelete: () => void; onSendNow: () => void }) {
+function ReminderCard({ reminder, onDelete, onToggle, onEdit, onSendNow }: { reminder: Reminder; onDelete: () => void; onToggle: () => void; onEdit: () => void; onSendNow: () => void }) {
   const typeLabels: Record<string, string> = {
     ph_check: '🧪 Log pH',
     gravity_check: '⚗️ Log Gravity (SG)',
@@ -1549,42 +1557,42 @@ function ReminderCard({ reminder, onDelete, onSendNow }: { reminder: Reminder; o
     custom: '⏰ Custom',
   }
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem', padding: '1rem 1.125rem', background: reminder.is_active ? 'var(--card-bg)' : 'var(--warm-white)', borderRadius: '10px', border: `1px solid ${reminder.is_active ? 'var(--border-light)' : 'var(--border)'}` }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem', padding: '1rem 1.125rem', background: reminder.is_active ? 'var(--card-bg)' : 'var(--warm-white)', borderRadius: '10px', border: `1px solid ${reminder.is_active ? 'var(--border-light)' : 'var(--border)'}`, opacity: reminder.is_active ? 1 : 0.65 }}>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
           <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{typeLabels[reminder.reminder_type] || reminder.reminder_type}</span>
-          {reminder.sms_enabled ? (
+          {!reminder.is_active && (
+            <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: 'var(--border)', color: 'var(--text-muted)', borderRadius: '20px' }}>Paused</span>
+          )}
+          {reminder.sms_enabled && reminder.is_active ? (
             <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: 3 }}>
               <Bell size={10} /> SMS on
             </span>
-          ) : (
+          ) : reminder.is_active ? (
             <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: 'var(--parchment)', color: 'var(--text-muted)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: 3 }}>
               <BellOff size={10} /> SMS off
             </span>
-          )}
+          ) : null}
         </div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>{reminder.message}</p>
         <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
           {friendlyInterval(reminder.interval_hours)}
-          {reminder.next_trigger_at && ` · Next: ${format(parseISO(reminder.next_trigger_at), 'MMM d, h:mm a')}`}
-          {reminder.phone_number && ` · ${reminder.phone_number}`}
+          {reminder.is_active && reminder.next_trigger_at && ` · Next: ${format(parseISO(reminder.next_trigger_at), 'MMM d, h:mm a')}`}
         </p>
       </div>
       <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
-        {reminder.sms_enabled && (
-          <button
-            onClick={onSendNow}
-            title="Send SMS now"
-            style={{ padding: '0.375rem 0.625rem', background: 'var(--parchment)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
-          >
+        {reminder.sms_enabled && reminder.is_active && (
+          <button onClick={onSendNow} title="Send SMS now" style={{ padding: '0.375rem 0.625rem', background: 'var(--parchment)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}>
             <Send size={12} /> Send
           </button>
         )}
-        <button
-          onClick={onDelete}
-          title="Delete reminder"
-          style={{ padding: '0.375rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)' }}
-        >
+        <button onClick={onEdit} title="Edit reminder" style={{ padding: '0.375rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <Pencil size={13} />
+        </button>
+        <button onClick={onToggle} title={reminder.is_active ? 'Pause reminder' : 'Resume reminder'} style={{ padding: '0.375rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: reminder.is_active ? 'var(--amber)' : 'var(--moss)' }}>
+          {reminder.is_active ? <BellOff size={13} /> : <Bell size={13} />}
+        </button>
+        <button onClick={onDelete} title="Delete reminder" style={{ padding: '0.375rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)' }}>
           <Trash2 size={13} />
         </button>
       </div>
@@ -1592,148 +1600,148 @@ function ReminderCard({ reminder, onDelete, onSendNow }: { reminder: Reminder; o
   )
 }
 
-function ReminderModal({ projectId, onClose, onAdded }: { projectId: number; onClose: () => void; onAdded: () => void }) {
+function hoursToUnit(hours: number): { count: string; unit: 'day' | 'week' | 'month' } {
+  if (hours >= 720 && hours % 720 === 0) return { count: String(hours / 720), unit: 'month' }
+  if (hours >= 168 && hours % 168 === 0) return { count: String(hours / 168), unit: 'week' }
+  return { count: String(Math.round(hours / 24) || 1), unit: 'day' }
+}
+
+function ReminderModal({ projectId, existing, onClose, onAdded }: { projectId: number; existing?: Reminder | null; onClose: () => void; onAdded: () => void }) {
   const { user } = useAuth()
-  const [form, setForm] = useState({
-    reminder_type: 'ph_check',
-    interval_count: '2',
-    interval_unit: 'day' as 'day' | 'week' | 'month',
-  })
-  const [showSmsConfirm, setShowSmsConfirm] = useState(false)
-  const [loading, setLoading] = useState(false)
 
   const PRESET_TYPES = [
-    { value: 'ph_check',        label: '🧪 Log pH',              defaultMsg: 'Time to check and log the pH on your fermentation!',          defaultCount: '2', defaultUnit: 'day'  as const },
-    { value: 'gravity_check',   label: '⚗️ Log Gravity (SG)',    defaultMsg: 'Time to take and log a specific gravity reading!',             defaultCount: '3', defaultUnit: 'day'  as const },
-    { value: 'co2_release',     label: '💨 CO₂ Release (Burp)',  defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!',     defaultCount: '1', defaultUnit: 'day'  as const },
+    { value: 'ph_check',        label: '🧪 Log pH',              defaultMsg: 'Time to check and log the pH on your fermentation!',           defaultCount: '2', defaultUnit: 'day'  as const },
+    { value: 'gravity_check',   label: '⚗️ Log Gravity (SG)',    defaultMsg: 'Time to take and log a specific gravity reading!',              defaultCount: '3', defaultUnit: 'day'  as const },
+    { value: 'co2_release',     label: '💨 CO₂ Release',         defaultMsg: 'Time to burp/release CO₂ from your fermentation vessel!',      defaultCount: '1', defaultUnit: 'day'  as const },
     { value: 'co2_limit',       label: '💥 CO₂ PSI Check',       defaultMsg: 'CO₂ pressure alert! Check your vessel PSI and vent if needed.', defaultCount: '12', defaultUnit: 'day' as const },
     { value: 'look_at_project', label: '👀 Check on Project',    defaultMsg: 'Time to check on your fermentation — observe aroma, color, and activity!', defaultCount: '1', defaultUnit: 'day' as const },
-    { value: 'custom',          label: '⏰ Custom',               defaultMsg: 'Time to check on your fermentation!',                        defaultCount: '2', defaultUnit: 'day'  as const },
+    { value: 'custom',          label: '⏰ Custom',               defaultMsg: 'Time to check on your fermentation!',                         defaultCount: '2', defaultUnit: 'day'  as const },
   ]
 
   const UNIT_HOURS = { day: 24, week: 168, month: 720 }
+
+  const initFromExisting = () => {
+    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false }
+    const { count, unit } = hoursToUnit(existing.interval_hours)
+    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled }
+  }
+
+  const [form, setForm] = useState(initFromExisting)
+  const [loading, setLoading] = useState(false)
 
   const selectPreset = (value: string) => {
     const preset = PRESET_TYPES.find(p => p.value === value)!
     setForm(prev => ({ ...prev, reminder_type: value, interval_count: preset.defaultCount, interval_unit: preset.defaultUnit }))
   }
 
-  const save = async (sms_enabled: boolean) => {
+  const save = async () => {
+    if (form.sms_enabled && !user?.phone_number) {
+      toast.error('Add a phone number in your profile to enable SMS reminders.')
+      return
+    }
     setLoading(true)
     try {
       const preset = PRESET_TYPES.find(p => p.value === form.reminder_type)!
       const interval_hours = Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]
-      await api.post(`/projects/${projectId}/reminders`, {
-        reminder_type: form.reminder_type,
-        message: preset.defaultMsg,
-        interval_hours,
-        sms_enabled,
-        phone_number: sms_enabled ? (user?.phone_number || undefined) : undefined,
-      })
-      toast.success('Reminder created!')
+      if (existing) {
+        await api.patch(`/reminders/${existing.id}`, {
+          interval_hours,
+          sms_enabled: form.sms_enabled,
+          message: preset.defaultMsg,
+        })
+        toast.success('Reminder updated!')
+      } else {
+        await api.post(`/projects/${projectId}/reminders`, {
+          reminder_type: form.reminder_type,
+          message: preset.defaultMsg,
+          interval_hours,
+          sms_enabled: form.sms_enabled,
+          phone_number: form.sms_enabled ? (user?.phone_number || undefined) : undefined,
+        })
+        toast.success('Reminder created!')
+      }
       onAdded()
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to create reminder')
+      toast.error(err?.response?.data?.detail || 'Failed to save reminder')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Modal title="Set Reminder" onClose={onClose}>
-      {showSmsConfirm ? (
-        /* SMS confirmation step */
-        <div>
-          <div style={{ textAlign: 'center', padding: '1rem 0 1.5rem' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📱</div>
-            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Enable SMS reminders?</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              We'll send a text to your phone number on file
-              {user?.phone_number ? <><br /><strong style={{ color: 'var(--text-secondary)' }}>{user.phone_number}</strong></> : ' when it\u2019s time.'}.
-            </p>
-            {!user?.phone_number && (
-              <p style={{ fontSize: '0.78rem', color: 'var(--amber)', marginTop: '0.5rem' }}>
-                No phone number saved — add one in your profile to use SMS reminders.
-              </p>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={() => save(false)}
-              disabled={loading}
-              style={{ flex: 1, padding: '0.7rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer' }}
-            >
-              No thanks
-            </button>
-            <button
-              type="button"
-              onClick={() => save(true)}
-              disabled={loading || !user?.phone_number}
-              style={{ flex: 2, padding: '0.7rem', background: user?.phone_number ? 'var(--moss)' : 'var(--border)', color: user?.phone_number ? '#fff' : 'var(--text-muted)', borderRadius: '8px', fontWeight: 600, cursor: user?.phone_number ? 'pointer' : 'not-allowed' }}
-            >
-              {loading ? 'Saving...' : 'Yes, enable SMS'}
-            </button>
+    <Modal title={existing ? 'Edit Reminder' : 'Set Reminder'} onClose={onClose}>
+      <form onSubmit={e => { e.preventDefault(); save() }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lStyle}>Reminder Type</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {PRESET_TYPES.map(p => (
+              <button
+                key={p.value}
+                type="button"
+                disabled={!!existing}
+                onClick={() => selectPreset(p.value)}
+                style={{
+                  padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', cursor: existing ? 'default' : 'pointer', textAlign: 'left',
+                  fontWeight: form.reminder_type === p.value ? 600 : 400,
+                  background: form.reminder_type === p.value ? 'var(--amber-glow)' : 'var(--warm-white)',
+                  border: `1px solid ${form.reminder_type === p.value ? 'var(--amber)' : 'var(--border)'}`,
+                  color: form.reminder_type === p.value ? 'var(--brown-dark)' : 'var(--text-secondary)',
+                  opacity: existing && form.reminder_type !== p.value ? 0.4 : 1,
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
         </div>
-      ) : (
-        /* Main form */
-        <form onSubmit={e => { e.preventDefault(); setShowSmsConfirm(true) }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={lStyle}>Reminder Type</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              {PRESET_TYPES.map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => selectPreset(p.value)}
-                  style={{
-                    padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', textAlign: 'left',
-                    fontWeight: form.reminder_type === p.value ? 600 : 400,
-                    background: form.reminder_type === p.value ? 'var(--amber-glow)' : 'var(--warm-white)',
-                    border: `1px solid ${form.reminder_type === p.value ? 'var(--amber)' : 'var(--border)'}`,
-                    color: form.reminder_type === p.value ? 'var(--brown-dark)' : 'var(--text-secondary)',
-                  }}
-                >
-                  {p.label}
-                </button>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lStyle}>Repeat Every</label>
+          <div style={{ display: 'flex', gap: '0.625rem' }}>
+            <select
+              value={form.interval_count}
+              onChange={e => setForm(prev => ({ ...prev, interval_count: e.target.value }))}
+              style={{ ...iStyle, flex: '0 0 auto', width: '90px', cursor: 'pointer' }}
+            >
+              {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
+                <option key={n} value={String(n)}>{n}</option>
               ))}
-            </div>
+            </select>
+            <select
+              value={form.interval_unit}
+              onChange={e => setForm(prev => ({ ...prev, interval_unit: e.target.value as 'day' | 'week' | 'month' }))}
+              style={{ ...iStyle, flex: 1, cursor: 'pointer' }}
+            >
+              <option value="day">{parseInt(form.interval_count) === 1 ? 'Day' : 'Days'}</option>
+              <option value="week">{parseInt(form.interval_count) === 1 ? 'Week' : 'Weeks'}</option>
+              <option value="month">{parseInt(form.interval_count) === 1 ? 'Month' : 'Months'}</option>
+            </select>
           </div>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
+            Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; {Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hours
+          </p>
+        </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={lStyle}>Repeat Every</label>
-            <div style={{ display: 'flex', gap: '0.625rem' }}>
-              <select
-                value={form.interval_count}
-                onChange={e => setForm(prev => ({ ...prev, interval_count: e.target.value }))}
-                style={{ ...iStyle, flex: '0 0 auto', width: '90px', cursor: 'pointer' }}
-              >
-                {Array.from({ length: 30 }, (_, i) => i + 1).map(n => (
-                  <option key={n} value={String(n)}>{n}</option>
-                ))}
-              </select>
-              <select
-                value={form.interval_unit}
-                onChange={e => setForm(prev => ({ ...prev, interval_unit: e.target.value as 'day' | 'week' | 'month' }))}
-                style={{ ...iStyle, flex: 1, cursor: 'pointer' }}
-              >
-                <option value="day">{parseInt(form.interval_count) === 1 ? 'Day' : 'Days'}</option>
-                <option value="week">{parseInt(form.interval_count) === 1 ? 'Week' : 'Weeks'}</option>
-                <option value="month">{parseInt(form.interval_count) === 1 ? 'Month' : 'Months'}</option>
-              </select>
-            </div>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-              Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; {Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hours
-            </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer', marginBottom: '1.5rem' }}>
+          <input
+            type="checkbox"
+            checked={form.sms_enabled}
+            onChange={e => setForm(prev => ({ ...prev, sms_enabled: e.target.checked }))}
+            style={{ width: 16, height: 16, accentColor: 'var(--moss)', cursor: 'pointer' }}
+          />
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>📱 SMS reminders</div>
+            {user?.phone_number
+              ? <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Text sent to {user.phone_number}</div>
+              : <div style={{ fontSize: '0.72rem', color: 'var(--amber)' }}>Add a phone number in your profile to enable</div>
+            }
           </div>
+        </label>
 
-          <ModalFooter onClose={onClose} loading={false} submitLabel="Create Reminder" />
-        </form>
-      )}
+        <ModalFooter onClose={onClose} loading={loading} submitLabel={existing ? 'Save Changes' : 'Create Reminder'} />
+      </form>
     </Modal>
   )
 }
-
 const iStyle: React.CSSProperties = { width: '100%', padding: '0.6rem 0.875rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.875rem', color: 'var(--text-primary)' }
 const lStyle: React.CSSProperties = { display: 'block', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.375rem' }
