@@ -1,0 +1,63 @@
+"""
+Background task that fires scheduled SMS reminders automatically.
+Runs every 60 seconds, checks for due reminders, sends SMS, and advances next_trigger_at.
+"""
+import asyncio
+import logging
+from datetime import datetime, timedelta, timezone
+from app.db.database import SessionLocal
+from app.models.models import Reminder, FermentationProject, User
+from app.services.twilio_service import send_sms
+
+logger = logging.getLogger(__name__)
+
+
+def _next_trigger(reminder: Reminder, now: datetime) -> datetime:
+    if reminder.preferred_hour is not None:
+        minute = reminder.preferred_minute or 0
+        candidate = (now + timedelta(hours=reminder.interval_hours)).replace(
+            hour=reminder.preferred_hour, minute=minute, second=0, microsecond=0
+        )
+        if candidate < now + timedelta(hours=reminder.interval_hours) - timedelta(hours=1):
+            candidate += timedelta(days=1)
+        return candidate
+    return now + timedelta(hours=reminder.interval_hours)
+
+
+async def reminder_loop():
+    logger.info("Reminder loop started.")
+    while True:
+        await asyncio.sleep(60)
+        db = SessionLocal()
+        try:
+            now = datetime.now(timezone.utc)
+            due = db.query(Reminder).filter(
+                Reminder.is_active == True,
+                Reminder.sms_enabled == True,
+                Reminder.next_trigger_at != None,
+                Reminder.next_trigger_at <= now,
+                Reminder.reminder_type != 'co2_limit',
+            ).all()
+
+            for reminder in due:
+                try:
+                    project = db.query(FermentationProject).filter(
+                        FermentationProject.id == reminder.project_id
+                    ).first()
+                    user = db.query(User).filter(User.id == reminder.user_id).first()
+                    phone = reminder.phone_number or (user.phone_number if user else None)
+
+                    if phone and project:
+                        msg = f'Fizz Bizz reminder for "{project.name}": {reminder.message}'
+                        send_sms(phone, msg)
+                        logger.info(f"Sent reminder {reminder.id} to {phone}")
+
+                    reminder.next_trigger_at = _next_trigger(reminder, now)
+                except Exception as e:
+                    logger.error(f"Failed to process reminder {reminder.id}: {e}")
+
+            db.commit()
+        except Exception as e:
+            logger.error(f"Reminder loop error: {e}")
+        finally:
+            db.close()

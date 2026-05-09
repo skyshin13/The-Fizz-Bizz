@@ -132,6 +132,8 @@ class ReminderCreate(BaseModel):
     interval_hours: int
     sms_enabled: bool = False
     phone_number: Optional[str] = None
+    preferred_hour: Optional[int] = None    # 0-23
+    preferred_minute: Optional[int] = None  # 0-59
 
 
 class ReminderOut(ReminderCreate):

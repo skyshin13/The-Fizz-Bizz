@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -6,7 +6,6 @@ from app.db.database import get_db
 from app.models.models import Reminder, FermentationProject, User
 from app.schemas.schemas import ReminderCreate, ReminderOut
 from app.api.deps import get_current_user
-from app.services.twilio_service import send_sms
 from pydantic import BaseModel
 
 
@@ -16,18 +15,38 @@ class ReminderUpdate(BaseModel):
     interval_hours: Optional[int] = None
     message: Optional[str] = None
     phone_number: Optional[str] = None
+    preferred_hour: Optional[int] = None
+    preferred_minute: Optional[int] = None
 
 router = APIRouter(tags=["Reminders"])
 
 REMINDER_MESSAGES = {
     "ph_check": "🧪 Time to check the pH on your fermentation! Log your reading to track progress.",
     "gravity_check": "⚗️ Time to take a gravity (SG) reading on your fermentation!",
-    "co2_release": "💨 Time to burp/release CO₂ from your fermentation vessel to prevent pressure buildup.",
     "co2_limit": "💥 CO₂ pressure alert! Check your fermentation vessel's PSI and consider venting if needed.",
     "look_at_project": "👀 Time to check on your fermentation — observe any changes in aroma, color, or activity.",
-    "taste": "👅 Time for a taste test on your fermentation!",
-    "custom": "⏰ Reminder for your fermentation project.",
 }
+
+
+def _calc_next_trigger(
+    now: datetime,
+    interval_hours: int,
+    preferred_hour: Optional[int],
+    preferred_minute: Optional[int],
+) -> datetime:
+    """Return the next trigger datetime respecting preferred time-of-day if set."""
+    if preferred_hour is None:
+        return now + timedelta(hours=interval_hours)
+
+    minute = preferred_minute or 0
+    # Find the next occurrence of preferred_hour:minute that is at least interval_hours away
+    candidate = (now + timedelta(hours=interval_hours)).replace(
+        hour=preferred_hour, minute=minute, second=0, microsecond=0
+    )
+    # If snapping to preferred time pushed us earlier than interval_hours from now, add one day
+    if candidate < now + timedelta(hours=interval_hours) - timedelta(hours=1):
+        candidate += timedelta(days=1)
+    return candidate
 
 
 @router.get("/projects/{project_id}/reminders", response_model=List[ReminderOut])
@@ -62,24 +81,25 @@ def create_reminder(
     if not project:
         raise HTTPException(404, "Project not found")
 
-    # Use user's saved phone number if none provided
     phone = body.phone_number or current_user.phone_number
     if body.sms_enabled and not phone:
         raise HTTPException(400, "A phone number is required to enable SMS reminders. Add one in your profile.")
 
-    # co2_limit uses interval_hours as a PSI threshold, not a time interval
+    now = datetime.now(timezone.utc)
     if body.reminder_type == 'co2_limit':
-        next_trigger = None
+        next_trigger = None  # triggered by measurement PSI check, not schedule
     else:
-        next_trigger = datetime.now(timezone.utc) + timedelta(hours=body.interval_hours)
+        next_trigger = _calc_next_trigger(now, body.interval_hours, body.preferred_hour, body.preferred_minute)
 
     reminder = Reminder(
         project_id=project_id,
         user_id=current_user.id,
         reminder_type=body.reminder_type,
-        message=body.message or REMINDER_MESSAGES.get(body.reminder_type, REMINDER_MESSAGES["custom"]),
+        message=body.message or REMINDER_MESSAGES.get(body.reminder_type, "⏰ Reminder for your fermentation project."),
         interval_hours=body.interval_hours,
         next_trigger_at=next_trigger,
+        preferred_hour=body.preferred_hour,
+        preferred_minute=body.preferred_minute,
         sms_enabled=body.sms_enabled,
         phone_number=phone,
         is_active=True,
@@ -105,6 +125,14 @@ def update_reminder(
         raise HTTPException(404, "Reminder not found")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(reminder, field, value)
+    # Recalculate next trigger if interval or preferred time changed
+    if reminder.reminder_type != 'co2_limit' and any(
+        f in body.model_dump(exclude_unset=True) for f in ('interval_hours', 'preferred_hour', 'preferred_minute')
+    ):
+        now = datetime.now(timezone.utc)
+        reminder.next_trigger_at = _calc_next_trigger(
+            now, reminder.interval_hours, reminder.preferred_hour, reminder.preferred_minute
+        )
     db.commit()
     db.refresh(reminder)
     return reminder
@@ -125,36 +153,3 @@ def delete_reminder(
     db.delete(reminder)
     db.commit()
     return {"ok": True}
-
-
-@router.post("/reminders/{reminder_id}/send")
-def send_reminder_now(
-    reminder_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Manually trigger an SMS reminder right now."""
-    reminder = db.query(Reminder).filter(
-        Reminder.id == reminder_id,
-        Reminder.user_id == current_user.id,
-    ).first()
-    if not reminder:
-        raise HTTPException(404, "Reminder not found")
-    if not reminder.sms_enabled:
-        raise HTTPException(400, "SMS is not enabled for this reminder")
-    phone = reminder.phone_number or current_user.phone_number
-    if not phone:
-        raise HTTPException(400, "No phone number on file")
-
-    project = db.query(FermentationProject).filter(FermentationProject.id == reminder.project_id).first()
-    project_name = project.name if project else "your fermentation project"
-    msg = f"Fizz Bizz reminder for \"{project_name}\": {reminder.message}"
-
-    sent = send_sms(phone, msg)
-    if not sent:
-        raise HTTPException(503, "SMS could not be sent. Check that Twilio credentials are configured in the server environment.")
-
-    # Advance the next trigger
-    reminder.next_trigger_at = datetime.now(timezone.utc) + timedelta(hours=reminder.interval_hours)
-    db.commit()
-    return {"ok": True, "message": "SMS sent successfully"}

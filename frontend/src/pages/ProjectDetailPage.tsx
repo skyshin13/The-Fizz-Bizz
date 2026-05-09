@@ -6,7 +6,7 @@ import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Send, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2, Globe, Lock } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2, Globe, Lock } from 'lucide-react'
 import styles from './ProjectDetailPage.module.css'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -22,7 +22,7 @@ export default function ProjectDetailPage() {
   const [showNote, setShowNote] = useState(false)
   const [showComplete, setShowComplete] = useState(false)
   const [activeChart, setActiveChart] = useState<'ph' | 'gravity'>('ph')
-  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'cer' | 'reminders'>('log')
+  const [activeTab, setActiveTab] = useState<'log' | 'album' | 'reminders'>('log')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [showReminder, setShowReminder] = useState(false)
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
@@ -51,13 +51,12 @@ export default function ProjectDetailPage() {
     await api.patch(`/reminders/${reminder.id}`, { is_active: !reminder.is_active })
     loadReminders()
   }
-  const sendReminderNow = async (reminderId: number) => {
-    try {
-      await api.post(`/reminders/${reminderId}/send`)
-      toast.success('SMS sent!')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to send SMS')
-    }
+  const syncCO2Reminders = () => {
+    const psi = parseInt(cerThreshold)
+    if (isNaN(psi) || psi <= 0) return
+    reminders
+      .filter(r => r.reminder_type === 'co2_limit' && r.is_active)
+      .forEach(r => api.patch(`/reminders/${r.id}`, { interval_hours: psi }).then(() => loadReminders()).catch(() => {}))
   }
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,8 +114,9 @@ export default function ProjectDetailPage() {
 
   const ALCOHOL_TYPES = new Set(['beer', 'wine', 'mead', 'cider', 'alcohol_brewing'])
   const isAlcohol = ALCOHOL_TYPES.has(project.fermentation_type)
-  const CER_TYPES = new Set(['beer', 'wine', 'cider'])
+  const CER_TYPES = new Set(['beer', 'wine', 'cider', 'mead', 'kombucha', 'water_kefir', 'probiotic_soda'])
   const hasCer = CER_TYPES.has(project.fermentation_type)
+  const hasKefirCO2 = project.fermentation_type === 'milk_kefir'
 
   const finalAbv = (project.initial_gravity && project.final_gravity)
     ? Math.max(0, (project.initial_gravity - project.final_gravity) * 131.25)
@@ -542,16 +542,51 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {hasCer && (
+        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+          <div style={{ borderBottom: '1px solid var(--border-light)', padding: '0.875rem 1.5rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            CO₂ Production
+          </div>
+          <div style={{ padding: '1.5rem' }}>
+            <CERTab
+              projectId={parseInt(id!)}
+              startDate={project.start_date}
+              initialGravity={project.initial_gravity}
+              batchSizeLiters={project.batch_size_liters}
+              fermentationTempCelsius={project.fermentation_temp_celsius}
+              sugarAmountGrams={project.sugar_amount_grams}
+              yeastStrain={project.yeast_strain}
+              threshold={cerThreshold}
+              onThresholdChange={setCerThreshold}
+              onThresholdBlur={syncCO2Reminders}
+            />
+          </div>
+        </div>
+      )}
+
+      {hasKefirCO2 && (
+        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+          <div style={{ borderBottom: '1px solid var(--border-light)', padding: '0.875rem 1.5rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            CO₂ Dynamics
+          </div>
+          <div style={{ padding: '1.5rem' }}>
+            <KefirCO2Section
+              fermentationTempCelsius={project.fermentation_temp_celsius}
+              startDate={project.start_date}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)' }}>
           {([
             ['log', 'Notes & Log'],
             ['album', `Album (${photos.length})`],
-            ...(hasCer ? [['cer', 'CO₂ Production']] : []),
             ['reminders', `Reminders${reminders.length ? ` (${reminders.length})` : ''}`],
           ] as const).map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab as 'log' | 'album' | 'cer' | 'reminders')} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
+            <button key={tab} onClick={() => setActiveTab(tab as 'log' | 'album' | 'reminders')} style={{ flex: 1, padding: '0.875rem', fontSize: '0.875rem', fontWeight: 500, background: 'transparent', color: activeTab === tab ? 'var(--amber)' : 'var(--text-muted)', borderBottom: activeTab === tab ? '2px solid var(--amber)' : '2px solid transparent', transition: 'color 0.15s' }}>
               {label}
             </button>
           ))}
@@ -654,7 +689,6 @@ export default function ProjectDetailPage() {
                     onDelete={() => deleteReminder(r.id)}
                     onToggle={() => toggleReminderActive(r)}
                     onEdit={() => setEditingReminder(r)}
-                    onSendNow={() => sendReminderNow(r.id)}
                   />
                 ))}
               </div>
@@ -662,21 +696,6 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {activeTab === 'cer' && hasCer && (
-          <div style={{ padding: '1.5rem' }}>
-            <CERTab
-              projectId={parseInt(id!)}
-              startDate={project.start_date}
-              initialGravity={project.initial_gravity}
-              batchSizeLiters={project.batch_size_liters}
-              fermentationTempCelsius={project.fermentation_temp_celsius}
-              sugarAmountGrams={project.sugar_amount_grams}
-              yeastStrain={project.yeast_strain}
-              threshold={cerThreshold}
-              onThresholdChange={setCerThreshold}
-            />
-          </div>
-        )}
       </div>
 
       {/* Lightbox */}
@@ -1009,7 +1028,7 @@ const PHASE_COLOR: Record<string, string> = { lag: '#94a3b8', exponential: '#f59
 const cerInput: React.CSSProperties = { width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.85rem', color: 'var(--text-primary)', boxSizing: 'border-box' }
 const cerLabel: React.CSSProperties = { display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.3rem' }
 
-function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams, yeastStrain, threshold, onThresholdChange }: {
+function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, fermentationTempCelsius, sugarAmountGrams, yeastStrain, threshold, onThresholdChange, onThresholdBlur }: {
   projectId: number
   startDate?: string
   initialGravity?: number
@@ -1019,6 +1038,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   yeastStrain?: { name?: string; strain_code?: string; yeast_type?: string } | null
   threshold: string
   onThresholdChange: (v: string) => void
+  onThresholdBlur?: () => void
 }) {
   const [strains, setStrains]           = useState<CERStrain[]>([])
   const [selectedStrain, setSelectedStrain] = useState<CERStrain | null>(null)
@@ -1333,7 +1353,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
         </div>
         <div>
           <label style={cerLabel}>PSI Alert Threshold</label>
-          <input type="number" step="0.5" value={threshold} onChange={e => onThresholdChange(e.target.value)} style={cerInput} />
+          <input type="number" step="0.5" value={threshold} onChange={e => onThresholdChange(e.target.value)} onBlur={onThresholdBlur} style={cerInput} />
         </div>
 
         <div>
@@ -1593,7 +1613,100 @@ function VisibilityPicker({ value, onChange }: { value: string; onChange: (v: st
   )
 }
 
-function ReminderCard({ reminder, onDelete, onToggle, onEdit, onSendNow }: { reminder: Reminder; onDelete: () => void; onToggle: () => void; onEdit: () => void; onSendNow: () => void }) {
+// Gorček et al. (2018) — exponential saturation model for dissolved CO₂ in milk kefir
+// C(t) = Ks × (1 − e^(−t/τs)), parameters interpolated from Table 1 (17–27 °C)
+function interpolateKefirParams(tempC: number): { Ks: number; taus: number } {
+  const t = Math.max(14, Math.min(30, tempC))
+  const Ks   = 0.172 + ((0.199 - 0.172) / (27 - 17)) * (t - 17)
+  const taus = 399.2 + ((207.8 - 399.2) / (27 - 17)) * (t - 17)
+  return { Ks: Math.max(0.01, Ks), taus: Math.max(30, taus) }
+}
+function kefirCO2Conc(tHours: number, tempC: number): number {
+  const { Ks, taus } = interpolateKefirParams(tempC)
+  return Ks * (1 - Math.exp(-(tHours * 60) / taus))
+}
+
+function KefirCO2Section({ fermentationTempCelsius, startDate }: { fermentationTempCelsius?: number; startDate?: string }) {
+  const defaultF = fermentationTempCelsius != null ? String(Math.round(toF(fermentationTempCelsius))) : '70'
+  const [tempF, setTempF] = useState(defaultF)
+  const tempC = toC(parseFloat(tempF) || 70)
+
+  const elapsedHours = useMemo(() => {
+    if (!startDate) return 0
+    return Math.max(0, (Date.now() - new Date(startDate).getTime()) / 3600000)
+  }, [startDate])
+
+  const chartData = useMemo(() =>
+    Array.from({ length: 61 }, (_, i) => ({
+      hours: i * 0.5,
+      co2: parseFloat(kefirCO2Conc(i * 0.5, tempC).toFixed(4)),
+    })),
+  [tempC])
+
+  const { Ks } = interpolateKefirParams(tempC)
+  const cappedElapsed = Math.min(elapsedHours, 30)
+  const currentCO2 = kefirCO2Conc(cappedElapsed, tempC)
+  const pct = Ks > 0 ? Math.round((currentCO2 / Ks) * 100) : 0
+  const showMarker = elapsedHours > 0 && elapsedHours <= 30
+
+  const stats = [
+    { label: 'Max CO₂ (Ks)', value: `${Ks.toFixed(3)} g/L` },
+    { label: 'Current CO₂', value: showMarker ? `${currentCO2.toFixed(3)} g/L` : '—' },
+    { label: 'Saturation', value: showMarker ? `${pct}%` : '—' },
+  ]
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        <div>
+          <label style={cerLabel}>Fermentation Temperature (°F)</label>
+          <input
+            type="number"
+            value={tempF}
+            onChange={e => setTempF(e.target.value)}
+            style={{ ...cerInput, width: '120px' }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {stats.map(s => (
+            <div key={s.label} style={{ textAlign: 'center', padding: '0.5rem 0.875rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>{s.label}</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--moss)' }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+          <XAxis dataKey="hours" type="number" domain={[0, 30]} tickFormatter={v => `${v}h`} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+          <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickFormatter={v => v.toFixed(2)} domain={[0, 'auto']} />
+          <Tooltip
+            contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }}
+            formatter={(v: number) => [`${v.toFixed(4)} g/L`, 'Dissolved CO₂']}
+            labelFormatter={l => `${l}h elapsed`}
+          />
+          <Line type="monotone" dataKey="co2" stroke="var(--moss)" strokeWidth={2.5} dot={false} />
+          {showMarker && (
+            <ReferenceLine
+              x={parseFloat(cappedElapsed.toFixed(1))}
+              stroke="var(--amber)"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              label={{ value: 'Now', fill: 'var(--amber)', fontSize: 11 }}
+            />
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+        Gorček et al. (2018) · Exponential saturation model for milk kefir dissolved CO₂ · Valid 17–27°C
+      </p>
+    </div>
+  )
+}
+
+function ReminderCard({ reminder, onDelete, onToggle, onEdit }: { reminder: Reminder; onDelete: () => void; onToggle: () => void; onEdit: () => void }) {
   const typeLabels: Record<string, string> = {
     ph_check: '🧪 Log pH',
     gravity_check: '⚗️ Log Gravity (SG)',
@@ -1629,11 +1742,6 @@ function ReminderCard({ reminder, onDelete, onToggle, onEdit, onSendNow }: { rem
         </p>
       </div>
       <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
-        {reminder.sms_enabled && reminder.is_active && (
-          <button onClick={onSendNow} title="Send SMS now" style={{ padding: '0.375rem 0.625rem', background: 'var(--parchment)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}>
-            <Send size={12} /> Send
-          </button>
-        )}
         <button onClick={onEdit} title="Edit reminder" style={{ padding: '0.375rem 0.5rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-muted)' }}>
           <Pencil size={13} />
         </button>
@@ -1669,12 +1777,14 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
 
   const initFromExisting = () => {
     const defaultPsi = cerThreshold || '10'
-    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, psi_threshold: defaultPsi }
+    const fmtTime = (h?: number | null, m?: number | null) =>
+      h != null ? `${String(h).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}` : ''
+    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, psi_threshold: defaultPsi, preferred_time: '' }
     if (existing.reminder_type === 'co2_limit') {
-      return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, psi_threshold: String(existing.interval_hours) }
+      return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, psi_threshold: String(existing.interval_hours), preferred_time: '' }
     }
     const { count, unit } = hoursToUnit(existing.interval_hours)
-    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, psi_threshold: defaultPsi }
+    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, psi_threshold: defaultPsi, preferred_time: fmtTime(existing.preferred_hour, existing.preferred_minute) }
   }
 
   const [form, setForm] = useState(initFromExisting)
@@ -1682,7 +1792,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
 
   const selectPreset = (value: string) => {
     const preset = PRESET_TYPES.find(p => p.value === value)!
-    setForm(prev => ({ ...prev, reminder_type: value, interval_count: preset.defaultCount, interval_unit: preset.defaultUnit }))
+    setForm(prev => ({ ...prev, reminder_type: value, interval_count: preset.defaultCount, interval_unit: preset.defaultUnit, preferred_time: '' }))
   }
 
   const save = async () => {
@@ -1696,11 +1806,20 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
       const interval_hours = isCO2(form.reminder_type)
         ? Math.max(1, parseInt(form.psi_threshold) || 10)
         : Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]
+      const supportsTime = form.reminder_type === 'ph_check' || form.reminder_type === 'gravity_check'
+      let preferred_hour: number | null = null
+      let preferred_minute: number | null = null
+      if (supportsTime && form.preferred_time) {
+        const [h, m] = form.preferred_time.split(':').map(Number)
+        preferred_hour = isNaN(h) ? null : h
+        preferred_minute = isNaN(m) ? null : m
+      }
       if (existing) {
         await api.patch(`/reminders/${existing.id}`, {
           interval_hours,
           sms_enabled: form.sms_enabled,
           message: preset.defaultMsg,
+          ...(supportsTime ? { preferred_hour, preferred_minute } : {}),
         })
         toast.success('Reminder updated!')
       } else {
@@ -1710,6 +1829,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
           interval_hours,
           sms_enabled: form.sms_enabled,
           phone_number: form.sms_enabled ? (user?.phone_number || undefined) : undefined,
+          ...(supportsTime ? { preferred_hour, preferred_minute } : {}),
         })
         toast.success('Reminder created!')
       }
@@ -1791,6 +1911,21 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
             </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
               Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; {Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hours
+            </p>
+          </div>
+        )}
+
+        {(form.reminder_type === 'ph_check' || form.reminder_type === 'gravity_check') && (
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={lStyle}>Preferred Time of Day <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <input
+              type="time"
+              value={form.preferred_time}
+              onChange={e => setForm(prev => ({ ...prev, preferred_time: e.target.value }))}
+              style={{ ...iStyle, width: 'auto' }}
+            />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
+              If set, reminders will fire around this time of day (UTC).
             </p>
           </div>
         )}

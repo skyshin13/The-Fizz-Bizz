@@ -161,8 +161,10 @@ class Reminder(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     reminder_type = Column(String)   # "ph_check", "gravity_check", "burp", "taste", "custom"
     message = Column(String)
-    interval_hours = Column(Integer)  # e.g. 48 for every 48 hours
+    interval_hours = Column(Integer)  # e.g. 48 for every 48 hours; for co2_limit stores PSI threshold
     next_trigger_at = Column(DateTime(timezone=True))
+    preferred_hour = Column(Integer, nullable=True)    # 0-23; if set, reminder fires at this UTC hour
+    preferred_minute = Column(Integer, nullable=True)  # 0-59
     is_active = Column(Boolean, default=True)
     sms_enabled = Column(Boolean, default=False)
     phone_number = Column(String)

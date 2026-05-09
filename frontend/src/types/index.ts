@@ -167,6 +167,8 @@ export interface Reminder {
   message: string
   interval_hours: number
   next_trigger_at?: string
+  preferred_hour?: number | null
+  preferred_minute?: number | null
   is_active: boolean
   sms_enabled: boolean
   phone_number?: string

@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.db.database import Base, engine
 from app.api.routes import auth, users, projects, yeasts, recipes, calculations, lookup, explore, friends, reminders
 from app.services.live_cer_task import live_cer_loop
+from app.services.reminder_task import reminder_loop
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,8 @@ def _run_migrations():
             # Columns
             "ALTER TABLE project_cer_states ADD COLUMN interval_seconds INTEGER NOT NULL DEFAULT 30",
             "ALTER TABLE fermentation_projects ADD COLUMN sugar_amount_grams REAL",
+            "ALTER TABLE reminders ADD COLUMN preferred_hour INTEGER",
+            "ALTER TABLE reminders ADD COLUMN preferred_minute INTEGER",
             "ALTER TABLE fermentation_projects ADD COLUMN visibility TEXT DEFAULT 'private'",
             # Indexes — fermentation_projects
             "CREATE INDEX IF NOT EXISTS ix_fp_user_id ON fermentation_projects (user_id)",
@@ -70,8 +73,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Startup DB error: {e}")
     task = asyncio.create_task(live_cer_loop())
+    rtask = asyncio.create_task(reminder_loop())
     yield
     task.cancel()
+    rtask.cancel()
 
 
 app = FastAPI(
