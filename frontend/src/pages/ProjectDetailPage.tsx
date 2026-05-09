@@ -249,7 +249,7 @@ export default function ProjectDetailPage() {
                       toast.error('Failed to update visibility')
                     }
                   }}
-                  style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', cursor: 'pointer' }}
+                  style={{ padding: '0.3rem 0.5rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', paddingRight: '1.4rem', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
                 >
                   <option value="private">🔒 Private</option>
                   <option value="friends">👥 Friends only</option>
