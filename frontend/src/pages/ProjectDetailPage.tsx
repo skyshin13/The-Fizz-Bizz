@@ -238,10 +238,9 @@ export default function ProjectDetailPage() {
               </div>
               {/* Visibility */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginTop: '0.75rem' }}>
-                <select
+                <VisibilityPicker
                   value={project.visibility || (project.is_public ? 'everyone' : 'private')}
-                  onChange={async e => {
-                    const vis = e.target.value
+                  onChange={async vis => {
                     try {
                       await api.patch(`/projects/${project.id}`, { visibility: vis, is_public: vis === 'everyone' })
                       await load()
@@ -250,13 +249,7 @@ export default function ProjectDetailPage() {
                       toast.error('Failed to update visibility')
                     }
                   }}
-                  style={{ padding: '0.3rem 0.5rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', paddingRight: '1.4rem', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
-                >
-                  <option value="private">🔒 Private</option>
-                  <option value="friends">👥 Friends only</option>
-                  <option value="followers">👤 Followers only</option>
-                  <option value="everyone">🌐 Public</option>
-                </select>
+                />
                 {(project.visibility === 'everyone' || project.is_public) && (
                   <button
                     onClick={() => {
@@ -1547,6 +1540,55 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+const VIS_OPTIONS = [
+  { value: 'private',   label: '🔒 Private' },
+  { value: 'friends',   label: '👥 Friends only' },
+  { value: 'followers', label: '👤 Followers only' },
+  { value: 'everyone',  label: '🌐 Public' },
+]
+
+function VisibilityPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const current = VIS_OPTIONS.find(o => o.value === value) ?? VIS_OPTIONS[0]
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.5rem', border: '1px solid var(--border)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--card-bg)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+      >
+        {current.label}
+        <svg width="8" height="5" viewBox="0 0 8 5" fill="none" style={{ flexShrink: 0, opacity: 0.6 }}>
+          <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: 'var(--shadow-lg)', zIndex: 50, minWidth: '100%', overflow: 'hidden' }}>
+          {VIS_OPTIONS.map(o => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => { onChange(o.value); setOpen(false) }}
+              style={{ display: 'block', width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: o.value === value ? 600 : 400, color: o.value === value ? 'var(--amber)' : 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap' }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
