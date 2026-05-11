@@ -166,11 +166,13 @@ export interface ProjectComment {
   id: number
   project_id: number
   user_id: number
+  parent_id?: number
   content: string
   created_at: string
   author_username: string
   author_display_name?: string
   author_avatar_url?: string
+  replies?: ProjectComment[]
 }
 
 export interface Reminder {

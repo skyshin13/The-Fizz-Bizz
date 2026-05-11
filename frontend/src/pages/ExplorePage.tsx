@@ -306,6 +306,12 @@ function PublicProjectCard({
   const [loadingComments, setLoadingComments] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [localCommentCount, setLocalCommentCount] = useState(project.comment_count)
+  const [replyingToId, setReplyingToId] = useState<number | null>(null)
+  const [replyTexts, setReplyTexts] = useState<Record<number, string>>({})
+  const [submittingReply, setSubmittingReply] = useState(false)
+
+  const countAllComments = (list: ProjectComment[]): number =>
+    list.reduce((sum, c) => sum + 1 + countAllComments(c.replies ?? []), 0)
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -339,15 +345,35 @@ function PublicProjectCard({
     if (!commentText.trim()) return
     setSubmitting(true)
     try {
-      const r = await api.post(`/projects/${project.id}/comments`, { content: commentText.trim() })
-      setComments(prev => [...prev, r.data])
+      await api.post(`/projects/${project.id}/comments`, { content: commentText.trim() })
+      const r = await api.get(`/projects/${project.id}/comments`)
+      setComments(r.data)
       setCommentText('')
-      setLocalCommentCount(prev => prev + 1)
+      const total = countAllComments(r.data)
+      setLocalCommentCount(total)
       onCommentAdd(project.id)
     } catch {
       toast.error('Failed to post comment')
     }
     setSubmitting(false)
+  }
+
+  const submitReply = async (e: React.FormEvent, parentId: number) => {
+    e.preventDefault()
+    const text = (replyTexts[parentId] ?? '').trim()
+    if (!text) return
+    setSubmittingReply(true)
+    try {
+      await api.post(`/projects/${project.id}/comments`, { content: text, parent_id: parentId })
+      const r = await api.get(`/projects/${project.id}/comments`)
+      setComments(r.data)
+      setReplyingToId(null)
+      setReplyTexts(prev => ({ ...prev, [parentId]: '' }))
+      setLocalCommentCount(countAllComments(r.data))
+    } catch {
+      toast.error('Failed to post reply')
+    }
+    setSubmittingReply(false)
   }
 
   return (
@@ -428,7 +454,7 @@ function PublicProjectCard({
             }}
           >
             <MessageCircle size={14} />
-            {localCommentCount}
+            {showComments ? countAllComments(comments) : localCommentCount}
           </button>
         </div>
 
@@ -437,14 +463,48 @@ function PublicProjectCard({
             {loadingComments ? (
               <div style={{ padding: '0.5rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading comments...</div>
             ) : (
-              <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '0.625rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ maxHeight: '240px', overflowY: 'auto', marginBottom: '0.625rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {comments.length === 0 && (
                   <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem' }}>No comments yet — be the first!</div>
                 )}
                 {comments.map(c => (
-                  <div key={c.id} style={{ fontSize: '0.775rem', background: 'var(--parchment)', borderRadius: '8px', padding: '0.5rem 0.625rem', lineHeight: 1.4 }}>
-                    <span style={{ fontWeight: 600, color: 'var(--brown-dark)', marginRight: '0.35rem' }}>@{c.author_username}</span>
-                    <span style={{ color: 'var(--text-secondary)' }}>{c.content}</span>
+                  <div key={c.id}>
+                    <div style={{ fontSize: '0.775rem', background: 'var(--parchment)', borderRadius: '8px', padding: '0.5rem 0.625rem', lineHeight: 1.4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: 'var(--brown-dark)', marginRight: '0.35rem' }}>@{c.author_username}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{c.content}</span>
+                        </div>
+                        <button
+                          onClick={() => { setReplyingToId(replyingToId === c.id ? null : c.id); setReplyTexts(prev => ({ ...prev, [c.id]: `@${c.author_username} ` })) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.68rem', whiteSpace: 'nowrap', marginLeft: '0.5rem', padding: '0 2px' }}
+                        >
+                          Reply
+                        </button>
+                      </div>
+                    </div>
+                    {/* Replies */}
+                    {(c.replies ?? []).map(reply => (
+                      <div key={reply.id} style={{ marginLeft: '1.25rem', marginTop: '0.25rem', fontSize: '0.755rem', background: 'var(--warm-white)', borderRadius: '7px', padding: '0.4rem 0.625rem', lineHeight: 1.4, border: '1px solid var(--border-light)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--brown-dark)', marginRight: '0.35rem' }}>@{reply.author_username}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{reply.content}</span>
+                      </div>
+                    ))}
+                    {/* Reply input */}
+                    {replyingToId === c.id && (
+                      <form onSubmit={e => submitReply(e, c.id)} style={{ marginLeft: '1.25rem', marginTop: '0.3rem', display: 'flex', gap: '0.3rem' }}>
+                        <input
+                          autoFocus
+                          value={replyTexts[c.id] ?? ''}
+                          onChange={e => setReplyTexts(prev => ({ ...prev, [c.id]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Escape') setReplyingToId(null) }}
+                          style={{ flex: 1, padding: '0.35rem 0.5rem', border: '1px solid var(--amber)', borderRadius: '6px', background: 'var(--warm-white)', fontSize: '0.755rem', fontFamily: 'DM Sans, sans-serif', outline: 'none' }}
+                        />
+                        <button type="submit" disabled={submittingReply || !(replyTexts[c.id] ?? '').trim()} style={{ padding: '0.35rem 0.6rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '6px', fontSize: '0.73rem', fontWeight: 600, opacity: (submittingReply || !(replyTexts[c.id] ?? '').trim()) ? 0.6 : 1 }}>
+                          {submittingReply ? '…' : 'Reply'}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 ))}
               </div>

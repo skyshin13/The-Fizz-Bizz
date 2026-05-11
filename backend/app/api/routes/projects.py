@@ -462,6 +462,22 @@ def unlike_project(
 
 # ─── Comments ──────────────────────────────────────────────────────────────────
 
+def _build_comment_out(row, users: dict) -> ProjectCommentOut:
+    author = users.get(row.user_id)
+    return ProjectCommentOut(
+        id=row.id,
+        project_id=row.project_id,
+        user_id=row.user_id,
+        parent_id=row.parent_id,
+        content=row.content,
+        created_at=row.created_at,
+        author_username=author.username if author else "unknown",
+        author_display_name=author.display_name if author else None,
+        author_avatar_url=author.avatar_url if author else None,
+        replies=[],
+    )
+
+
 @router.get("/{project_id}/comments", response_model=List[ProjectCommentOut])
 def list_comments(
     project_id: int,
@@ -479,20 +495,20 @@ def list_comments(
     )
     user_ids = list({r.user_id for r in rows})
     users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
-    result = []
+
+    # Build nested structure: top-level comments with replies embedded
+    by_id: dict = {}
+    top_level: list = []
     for r in rows:
-        author = users.get(r.user_id)
-        result.append(ProjectCommentOut(
-            id=r.id,
-            project_id=r.project_id,
-            user_id=r.user_id,
-            content=r.content,
-            created_at=r.created_at,
-            author_username=author.username if author else "unknown",
-            author_display_name=author.display_name if author else None,
-            author_avatar_url=author.avatar_url if author else None,
-        ))
-    return result
+        out = _build_comment_out(r, users)
+        by_id[r.id] = out
+    for r in rows:
+        out = by_id[r.id]
+        if r.parent_id and r.parent_id in by_id:
+            by_id[r.parent_id].replies.append(out)
+        else:
+            top_level.append(out)
+    return top_level
 
 
 @router.post("/{project_id}/comments", response_model=ProjectCommentOut, status_code=201)
@@ -505,19 +521,45 @@ def add_comment(
     project = db.query(FermentationProject).filter_by(id=project_id).first()
     if not project or not _can_view(project, current_user, db):
         raise HTTPException(404, "Project not found")
-    comment = ProjectComment(project_id=project_id, user_id=current_user.id, content=body.content.strip())
+
+    # Validate parent if replying
+    parent = None
+    if body.parent_id:
+        parent = db.query(ProjectComment).filter_by(id=body.parent_id, project_id=project_id).first()
+        if not parent:
+            raise HTTPException(404, "Parent comment not found")
+
+    comment = ProjectComment(
+        project_id=project_id,
+        user_id=current_user.id,
+        content=body.content.strip(),
+        parent_id=body.parent_id,
+    )
     db.add(comment)
     db.commit()
     db.refresh(comment)
+
+    # Notify the parent comment's author via SMS if they have it enabled
+    if parent and parent.user_id != current_user.id:
+        parent_author = db.query(User).filter_by(id=parent.user_id).first()
+        if parent_author and parent_author.sms_notifications_enabled and parent_author.phone_number:
+            from app.services.twilio_service import send_sms
+            send_sms(
+                parent_author.phone_number,
+                f"@{current_user.username} replied to your comment on \"{project.name}\": {body.content.strip()[:100]}",
+            )
+
     return ProjectCommentOut(
         id=comment.id,
         project_id=comment.project_id,
         user_id=comment.user_id,
+        parent_id=comment.parent_id,
         content=comment.content,
         created_at=comment.created_at,
         author_username=current_user.username,
         author_display_name=current_user.display_name,
         author_avatar_url=current_user.avatar_url,
+        replies=[],
     )
 
 
@@ -534,5 +576,6 @@ def delete_comment(
     project = db.query(FermentationProject).filter_by(id=project_id).first()
     if comment.user_id != current_user.id and (not project or project.user_id != current_user.id):
         raise HTTPException(403, "Not authorized")
+    # Cascade-delete replies first (SQLAlchemy relationship cascade handles this)
     db.delete(comment)
     db.commit()

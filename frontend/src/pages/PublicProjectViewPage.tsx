@@ -79,7 +79,13 @@ export default function PublicProjectViewPage() {
   const [comments, setComments] = useState<ProjectComment[]>([])
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<ProjectComment | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [submittingReply, setSubmittingReply] = useState(false)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
+
+  const countAllComments = (list: ProjectComment[]): number =>
+    list.reduce((sum, c) => sum + 1 + countAllComments(c.replies ?? []), 0)
 
   const loadComments = () =>
     api.get(`/projects/${id}/comments`).then(r => setComments(r.data)).catch(() => {})
@@ -128,9 +134,32 @@ export default function PublicProjectViewPage() {
     }
   }
 
-  const deleteComment = async (commentId: number) => {
+  const submitReply = async (parentId: number) => {
+    const text = replyText.trim()
+    if (!text || submittingReply) return
+    setSubmittingReply(true)
+    try {
+      await api.post(`/projects/${id}/comments`, { content: text, parent_id: parentId })
+      setReplyingTo(null)
+      setReplyText('')
+      loadComments()
+    } catch {
+      /* ignore */
+    } finally {
+      setSubmittingReply(false)
+    }
+  }
+
+  const deleteComment = async (commentId: number, isReply = false) => {
     await api.delete(`/projects/${id}/comments/${commentId}`)
-    setComments(prev => prev.filter(c => c.id !== commentId))
+    if (isReply) {
+      setComments(prev => prev.map(c => ({
+        ...c,
+        replies: (c.replies ?? []).filter(r => r.id !== commentId),
+      })))
+    } else {
+      setComments(prev => prev.filter(c => c.id !== commentId))
+    }
   }
 
   if (loading) return (
@@ -231,7 +260,7 @@ export default function PublicProjectViewPage() {
             onClick={() => commentInputRef.current?.focus()}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' }}
           >
-            <MessageCircle size={14} /> {comments.length} comment{comments.length !== 1 ? 's' : ''}
+            <MessageCircle size={14} /> {countAllComments(comments)} comment{countAllComments(comments) !== 1 ? 's' : ''}
           </button>
         </div>
       </div>
@@ -372,7 +401,7 @@ export default function PublicProjectViewPage() {
       {/* Comments */}
       <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)', marginBottom: '1.25rem' }}>
         <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Comments {comments.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({comments.length})</span>}
+          Comments {countAllComments(comments) > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({countAllComments(comments)})</span>}
         </h2>
 
         {comments.length === 0 && (
@@ -380,33 +409,21 @@ export default function PublicProjectViewPage() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '1.25rem' }}>
-          {comments.map(c => {
-            const cAuthor = c.author_display_name || c.author_username
-            const isOwn = user?.id === c.user_id
-            return (
-              <div key={c.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '0.75rem', color: 'var(--brown-dark)', flexShrink: 0, overflow: 'hidden' }}>
-                  {c.author_avatar_url ? (
-                    <img src={c.author_avatar_url} alt={cAuthor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : cAuthor[0]?.toUpperCase()}
-                </div>
-                <div style={{ flex: 1, background: 'var(--parchment)', borderRadius: '10px', padding: '0.6rem 0.875rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{cAuthor}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
-                      {isOwn && (
-                        <button onClick={() => deleteComment(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
-                          <Trash2 size={11} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{c.content}</p>
-                </div>
-              </div>
-            )
-          })}
+          {comments.map(c => (
+            <CommentItem
+              key={c.id}
+              comment={c}
+              currentUserId={user?.id}
+              replyingTo={replyingTo}
+              replyText={replyText}
+              submittingReply={submittingReply}
+              onReply={c => { setReplyingTo(c); setReplyText(`@${c.author_username} `) }}
+              onCancelReply={() => { setReplyingTo(null); setReplyText('') }}
+              onReplyTextChange={setReplyText}
+              onSubmitReply={submitReply}
+              onDelete={deleteComment}
+            />
+          ))}
         </div>
 
         {/* Comment input */}
@@ -450,6 +467,123 @@ function Detail({ icon, label, children }: { icon: React.ReactNode; label: strin
         {icon} {label}
       </span>
       <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{children}</span>
+    </div>
+  )
+}
+
+interface CommentItemProps {
+  comment: ProjectComment
+  currentUserId?: number
+  replyingTo: ProjectComment | null
+  replyText: string
+  submittingReply: boolean
+  onReply: (comment: ProjectComment) => void
+  onCancelReply: () => void
+  onReplyTextChange: (text: string) => void
+  onSubmitReply: (parentId: number) => void
+  onDelete: (commentId: number, isReply?: boolean) => void
+  isReply?: boolean
+}
+
+function CommentItem({
+  comment: c,
+  currentUserId,
+  replyingTo,
+  replyText,
+  submittingReply,
+  onReply,
+  onCancelReply,
+  onReplyTextChange,
+  onSubmitReply,
+  onDelete,
+  isReply = false,
+}: CommentItemProps) {
+  const cAuthor = c.author_display_name || c.author_username
+  const isOwn = currentUserId === c.user_id
+  const showReplyBox = replyingTo?.id === c.id
+
+  return (
+    <div style={{ marginLeft: isReply ? '2.25rem' : 0 }}>
+      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+        <div style={{ width: isReply ? 26 : 30, height: isReply ? 26 : 30, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '0.75rem', color: 'var(--brown-dark)', flexShrink: 0, overflow: 'hidden' }}>
+          {c.author_avatar_url ? (
+            <img src={c.author_avatar_url} alt={cAuthor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : cAuthor[0]?.toUpperCase()}
+        </div>
+        <div style={{ flex: 1, background: isReply ? 'var(--warm-white)' : 'var(--parchment)', borderRadius: '10px', padding: '0.6rem 0.875rem', border: isReply ? '1px solid var(--border-light)' : 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{cAuthor}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
+              {!isReply && (
+                <button
+                  onClick={() => onReply(c)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.7rem' }}
+                >
+                  <MessageCircle size={10} /> Reply
+                </button>
+              )}
+              {isOwn && (
+                <button onClick={() => onDelete(c.id, isReply)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </div>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{c.content}</p>
+        </div>
+      </div>
+
+      {/* Reply input box */}
+      {showReplyBox && (
+        <div style={{ marginLeft: '2.25rem', marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+          <textarea
+            autoFocus
+            value={replyText}
+            onChange={e => onReplyTextChange(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmitReply(c.id) } if (e.key === 'Escape') onCancelReply() }}
+            rows={2}
+            style={{ flex: 1, padding: '0.5rem 0.75rem', border: '1px solid var(--amber)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.82rem', resize: 'none', fontFamily: 'DM Sans, sans-serif', outline: 'none' }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <button
+              onClick={() => onSubmitReply(c.id)}
+              disabled={!replyText.trim() || submittingReply}
+              style={{ padding: '0.45rem 0.75rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '6px', border: 'none', cursor: replyText.trim() ? 'pointer' : 'default', opacity: replyText.trim() ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, fontSize: '0.78rem' }}
+            >
+              <Send size={12} /> Reply
+            </button>
+            <button
+              onClick={onCancelReply}
+              style={{ padding: '0.35rem 0.75rem', background: 'transparent', color: 'var(--text-muted)', borderRadius: '6px', border: '1px solid var(--border)', cursor: 'pointer', fontSize: '0.75rem' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Nested replies */}
+      {(c.replies ?? []).length > 0 && (
+        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {(c.replies ?? []).map(reply => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              currentUserId={currentUserId}
+              replyingTo={replyingTo}
+              replyText={replyText}
+              submittingReply={submittingReply}
+              onReply={onReply}
+              onCancelReply={onCancelReply}
+              onReplyTextChange={onReplyTextChange}
+              onSubmitReply={onSubmitReply}
+              onDelete={onDelete}
+              isReply
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

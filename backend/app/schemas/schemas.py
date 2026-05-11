@@ -582,20 +582,26 @@ class PublicProjectDetailOut(BaseModel):
 
 class ProjectCommentCreate(BaseModel):
     content: str
+    parent_id: Optional[int] = None
 
 
 class ProjectCommentOut(BaseModel):
     id: int
     project_id: int
     user_id: int
+    parent_id: Optional[int] = None
     content: str
     created_at: datetime
     author_username: str
     author_display_name: Optional[str] = None
     author_avatar_url: Optional[str] = None
+    replies: List['ProjectCommentOut'] = []
 
     class Config:
         from_attributes = True
+
+
+ProjectCommentOut.model_rebuild()
 
 
 class FriendInteractionOut(BaseModel):

@@ -357,8 +357,11 @@ class ProjectComment(Base):
     id         = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("fermentation_projects.id"), nullable=False, index=True)
     user_id    = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    parent_id  = Column(Integer, ForeignKey("project_comments.id"), nullable=True, index=True)
     content    = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     project = relationship("FermentationProject", back_populates="comments")
     user    = relationship("User", back_populates="project_comments")
+    replies = relationship("ProjectComment", foreign_keys=[parent_id], back_populates="parent", cascade="all, delete-orphan")
+    parent  = relationship("ProjectComment", foreign_keys=[parent_id], back_populates="replies", remote_side="ProjectComment.id")
