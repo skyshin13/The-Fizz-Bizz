@@ -1247,9 +1247,10 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
 
   // Merge live points and simulated curve into a single dataset for the chart
   const mergedChartData = useMemo(() => {
-    const visibleSim = windowH !== null
-      ? simCurve.filter(p => p.hours_elapsed >= minH && p.hours_elapsed <= maxH + windowH)
-      : simCurve.filter(p => p.hours_elapsed <= maxH)
+    const simEnd = windowH !== null ? minH + windowH : maxH
+    const visibleSim = simCurve.filter(p =>
+      p.hours_elapsed >= (windowH !== null ? minH : 0) && p.hours_elapsed <= simEnd
+    )
     const map = new Map<string, { hours_elapsed: number; co2_psi?: number; predicted_psi?: number }>()
     for (const p of visiblePoints) {
       map.set(p.hours_elapsed.toFixed(3), { hours_elapsed: p.hours_elapsed, co2_psi: p.co2_psi })
@@ -1261,16 +1262,13 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
       else map.set(key, { hours_elapsed: p.hours_elapsed, predicted_psi: p.predicted_psi })
     }
     return Array.from(map.values()).sort((a, b) => a.hours_elapsed - b.hours_elapsed)
-  }, [visiblePoints, simCurve, windowH, minH])
+  }, [visiblePoints, simCurve, windowH, minH, maxH])
 
-  // Function-based domain pins exact bounds regardless of data extent.
-  const xDomain = windowH !== null
-    ? [() => minH, () => minH + windowH]
-    : ['dataMin', 'dataMax']
+  // Static domain values — function-based domains in Recharts 2.12 don't reliably
+  // re-evaluate on re-render, causing stale axis bounds after a window change.
+  const xDomainMin = windowH !== null ? minH : 'dataMin'
+  const xDomainMax = windowH !== null ? minH + windowH : 'dataMax'
 
-  // Explicit tick list avoids Recharts rounding duplicates.
-  // Sub-hour: 5 evenly spaced ticks (relative labels in minutes).
-  // Hour-scale: one tick per integer hour within the window (absolute labels).
   const xTicks = useMemo(() => {
     if (windowH === null) return undefined
     if (windowH < 1) {
@@ -1281,7 +1279,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
     const endH = Math.floor(minH + windowH)
     const ticks: number[] = []
     for (let h = startH; h <= endH; h++) ticks.push(h)
-    return ticks
+    return ticks.length > 0 ? ticks : undefined
   }, [minH, windowH])
 
   const filtered = strains.filter(s =>
@@ -1501,12 +1499,12 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
 
           {!loading && points.length > 0 && (
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={mergedChartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <LineChart key={`cer-${windowH}-${minH}`} data={mergedChartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="hours_elapsed"
                   type="number"
-                  domain={xDomain as any}
+                  domain={[xDomainMin, xDomainMax]}
                   ticks={xTicks}
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
                   label={{ value: windowH !== null ? (windowH < 1 ? `Last ${Math.round(windowH * 60)}m` : `Last ${windowH % 1 === 0 ? windowH.toFixed(0) : windowH}h`) : 'Hours since start', position: 'insideBottom', offset: -2, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
