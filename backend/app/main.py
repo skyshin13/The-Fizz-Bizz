@@ -23,6 +23,7 @@ def _run_migrations():
             "ALTER TABLE reminders ADD COLUMN preferred_hour INTEGER",
             "ALTER TABLE reminders ADD COLUMN preferred_minute INTEGER",
             "ALTER TABLE fermentation_projects ADD COLUMN visibility TEXT DEFAULT 'private'",
+            "ALTER TABLE users ADD COLUMN show_activity_to_friends BOOLEAN DEFAULT FALSE",
             # Indexes — fermentation_projects
             "CREATE INDEX IF NOT EXISTS ix_fp_user_id ON fermentation_projects (user_id)",
             "CREATE INDEX IF NOT EXISTS ix_fp_is_public ON fermentation_projects (is_public)",

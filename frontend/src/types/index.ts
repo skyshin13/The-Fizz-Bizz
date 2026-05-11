@@ -43,6 +43,7 @@ export interface User {
   bio?: string
   avatar_url?: string
   sms_notifications_enabled: boolean
+  show_activity_to_friends: boolean
   created_at: string
 }
 
@@ -141,8 +142,21 @@ export interface FriendRequest {
   friend: PublicUser
 }
 
+export interface FriendInteraction {
+  friend_username: string
+  friend_display_name?: string
+  friend_avatar_url?: string
+  action: 'liked' | 'commented'
+  at: string
+}
+
+export interface FriendActivityProject extends PublicProject {
+  friend_interactions: FriendInteraction[]
+}
+
 export interface PublicUserProfile extends PublicUser {
   public_projects: PublicProject[]
+  liked_projects: PublicProject[]
   friendship_id?: number
   friendship_status?: 'pending' | 'accepted'
   is_requester?: boolean

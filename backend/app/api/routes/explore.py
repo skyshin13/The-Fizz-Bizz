@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 from typing import List, Optional
+from collections import defaultdict
 from app.db.database import get_db
 from app.models.models import FermentationProject, MeasurementLog, User, Friendship, FriendshipStatus, UserFollow, ProjectLike, ProjectComment
-from app.schemas.schemas import PublicProjectOut, PublicUserOut, SharedProjectOut, SharedMeasurementOut
+from app.schemas.schemas import PublicProjectOut, PublicUserOut, SharedProjectOut, SharedMeasurementOut, FriendInteractionOut, FriendActivityProjectOut
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/explore", tags=["Explore"])
@@ -202,3 +203,173 @@ def search_users(
         )
         for u in users
     ]
+
+
+@router.get("/friend-activity", response_model=List[FriendActivityProjectOut])
+def friend_activity(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    friendships = db.query(Friendship).filter(
+        or_(
+            Friendship.requester_id == current_user.id,
+            Friendship.receiver_id == current_user.id,
+        ),
+        Friendship.status == FriendshipStatus.ACCEPTED,
+    ).all()
+    friend_ids = {
+        f.receiver_id if f.requester_id == current_user.id else f.requester_id
+        for f in friendships
+    }
+    if not friend_ids:
+        return []
+
+    active_friends = db.query(User).filter(
+        User.id.in_(friend_ids),
+        User.show_activity_to_friends == True,
+    ).all()
+    if not active_friends:
+        return []
+
+    active_friend_ids = {u.id for u in active_friends}
+    active_friend_map = {u.id: u for u in active_friends}
+
+    recent_likes = (
+        db.query(ProjectLike)
+        .filter(ProjectLike.user_id.in_(active_friend_ids))
+        .order_by(ProjectLike.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    recent_comments = (
+        db.query(ProjectComment)
+        .filter(ProjectComment.user_id.in_(active_friend_ids))
+        .order_by(ProjectComment.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    project_id_set = {l.project_id for l in recent_likes} | {c.project_id for c in recent_comments}
+    if not project_id_set:
+        return []
+
+    projects = (
+        db.query(FermentationProject)
+        .options(joinedload(FermentationProject.owner), joinedload(FermentationProject.measurements))
+        .filter(
+            FermentationProject.id.in_(project_id_set),
+            FermentationProject.user_id != current_user.id,
+        )
+        .all()
+    )
+
+    try:
+        following_ids = {
+            f.followed_id
+            for f in db.query(UserFollow).filter_by(follower_id=current_user.id).all()
+        }
+    except Exception:
+        following_ids = set()
+
+    visible_project_map = {}
+    for p in projects:
+        vis = p.visibility or ("everyone" if p.is_public else "private")
+        if vis == "everyone":
+            visible_project_map[p.id] = p
+        elif vis == "friends" and p.user_id in friend_ids:
+            visible_project_map[p.id] = p
+        elif vis == "followers" and p.user_id in following_ids:
+            visible_project_map[p.id] = p
+
+    if not visible_project_map:
+        return []
+
+    project_interactions: dict = defaultdict(list)
+    latest_activity: dict = {}
+
+    for like in recent_likes:
+        pid = like.project_id
+        if pid not in visible_project_map or like.user_id not in active_friend_ids:
+            continue
+        friend = active_friend_map[like.user_id]
+        project_interactions[pid].append(FriendInteractionOut(
+            friend_username=friend.username,
+            friend_display_name=friend.display_name,
+            friend_avatar_url=friend.avatar_url,
+            action="liked",
+            at=like.created_at,
+        ))
+        if pid not in latest_activity or like.created_at > latest_activity[pid]:
+            latest_activity[pid] = like.created_at
+
+    for comment in recent_comments:
+        pid = comment.project_id
+        if pid not in visible_project_map or comment.user_id not in active_friend_ids:
+            continue
+        friend = active_friend_map[comment.user_id]
+        project_interactions[pid].append(FriendInteractionOut(
+            friend_username=friend.username,
+            friend_display_name=friend.display_name,
+            friend_avatar_url=friend.avatar_url,
+            action="commented",
+            at=comment.created_at,
+        ))
+        if pid not in latest_activity or comment.created_at > latest_activity[pid]:
+            latest_activity[pid] = comment.created_at
+
+    sorted_pids = sorted(
+        [pid for pid in visible_project_map if pid in latest_activity],
+        key=lambda pid: latest_activity[pid],
+        reverse=True,
+    )
+
+    start = (page - 1) * per_page
+    page_pids = sorted_pids[start:start + per_page]
+    if not page_pids:
+        return []
+
+    like_counts = {
+        row.project_id: row.cnt
+        for row in db.query(ProjectLike.project_id, func.count(ProjectLike.id).label("cnt"))
+        .filter(ProjectLike.project_id.in_(page_pids))
+        .group_by(ProjectLike.project_id)
+        .all()
+    }
+    comment_counts = {
+        row.project_id: row.cnt
+        for row in db.query(ProjectComment.project_id, func.count(ProjectComment.id).label("cnt"))
+        .filter(ProjectComment.project_id.in_(page_pids))
+        .group_by(ProjectComment.project_id)
+        .all()
+    }
+    my_likes = {
+        row.project_id
+        for row in db.query(ProjectLike.project_id)
+        .filter(ProjectLike.project_id.in_(page_pids), ProjectLike.user_id == current_user.id)
+        .all()
+    }
+
+    result = []
+    for pid in page_pids:
+        p = visible_project_map[pid]
+        interactions = sorted(project_interactions.get(pid, []), key=lambda x: x.at, reverse=True)[:5]
+        result.append(FriendActivityProjectOut(
+            id=p.id,
+            user_id=p.user_id,
+            name=p.name,
+            fermentation_type=p.fermentation_type,
+            status=p.status,
+            description=p.description,
+            cover_photo_url=p.cover_photo_url,
+            created_at=p.created_at,
+            author_username=p.owner.username,
+            author_display_name=p.owner.display_name,
+            measurement_count=len(p.measurements),
+            like_count=like_counts.get(pid, 0),
+            is_liked_by_me=pid in my_likes,
+            comment_count=comment_counts.get(pid, 0),
+            friend_interactions=interactions,
+        ))
+    return result

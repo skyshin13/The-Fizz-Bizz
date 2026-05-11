@@ -3,10 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { PublicUserProfile, FriendRequest, PublicProject } from '../types'
+import { PublicUserProfile, FriendRequest, PublicProject, FriendActivityProject } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell, Camera } from 'lucide-react'
+import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell, Camera, Heart } from 'lucide-react'
 import styles from './ProfilePage.module.css'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -23,15 +23,22 @@ export default function ProfilePage() {
 function OwnProfile() {
   const { user: me, refreshUser } = useAuth()
   const [friends, setFriends] = useState<FriendRequest[]>([])
+  const [friendActivity, setFriendActivity] = useState<FriendActivityProject[]>([])
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
+  const { getEmoji } = useFermentationTypes()
 
   const loadFriends = () => {
     setLoading(true)
     api.get('/friends/').then(r => setFriends(r.data)).finally(() => setLoading(false))
   }
 
-  useEffect(() => { loadFriends() }, [])
+  useEffect(() => {
+    loadFriends()
+    api.get('/explore/friend-activity', { params: { per_page: 6 } })
+      .then(r => setFriendActivity(r.data))
+      .catch(() => {})
+  }, [])
 
   const accepted = friends.filter(f => f.status === 'accepted')
   const pendingReceived = friends.filter(f => f.status === 'pending' && f.receiver_id === me?.id)
@@ -137,6 +144,26 @@ function OwnProfile() {
           </div>
         )}
       </div>
+
+      {/* Friends' Recent Activity */}
+      {friendActivity.length > 0 && (
+        <div className="fade-in-delay-2" style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Heart size={16} color="var(--brown-mid)" />
+              <h2 style={{ fontSize: '1.1rem' }}>Friends' Recent Activity</h2>
+            </div>
+            <Link to="/explore" style={{ fontSize: '0.8rem', color: 'var(--amber)', fontWeight: 500, textDecoration: 'none' }}>
+              See all →
+            </Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
+            {friendActivity.map(p => (
+              <PublicProjectMiniCard key={p.id} project={p} getEmoji={getEmoji} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pending sent */}
       {pendingSent.length > 0 && (
@@ -266,6 +293,21 @@ function OtherProfile({ username }: { username: string }) {
           </div>
         )}
       </div>
+
+      {/* Liked projects — visible when friendship accepted and user shares activity */}
+      {profile.liked_projects && profile.liked_projects.length > 0 && (
+        <div className="fade-in-delay-2" style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
+            <Heart size={16} color="var(--brown-mid)" />
+            <h2 style={{ fontSize: '1.1rem' }}>Projects @{profile.username} liked</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+            {profile.liked_projects.map(p => (
+              <PublicProjectMiniCard key={p.id} project={p} getEmoji={getEmoji} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -312,6 +354,7 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
     bio: me?.bio || '',
     phone_number: me?.phone_number || '',
     sms_notifications_enabled: me?.sms_notifications_enabled ?? false,
+    show_activity_to_friends: me?.show_activity_to_friends ?? false,
   })
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string>(me?.avatar_url || '')
@@ -352,6 +395,7 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
         bio: form.bio || null,
         phone_number: form.phone_number || null,
         sms_notifications_enabled: form.sms_notifications_enabled,
+        show_activity_to_friends: form.show_activity_to_friends,
         avatar_url,
       })
       toast.success('Profile updated!')
@@ -420,7 +464,7 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
               Include country code, e.g. +1 for US. Used for fermentation reminders via SMS.
             </p>
           </div>
-          <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px' }}>
+          <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px' }}>
             <input
               type="checkbox"
               id="sms_toggle"
@@ -431,6 +475,19 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
             <label htmlFor="sms_toggle" style={{ fontSize: '0.875rem', cursor: 'pointer', userSelect: 'none' }}>
               <Bell size={13} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--moss)' }} />
               Enable SMS reminders for my fermentation projects
+            </label>
+          </div>
+          <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px' }}>
+            <input
+              type="checkbox"
+              id="activity_toggle"
+              checked={form.show_activity_to_friends}
+              onChange={e => setForm(prev => ({ ...prev, show_activity_to_friends: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
+            />
+            <label htmlFor="activity_toggle" style={{ fontSize: '0.875rem', cursor: 'pointer', userSelect: 'none' }}>
+              <Heart size={13} style={{ verticalAlign: 'middle', marginRight: 4, color: '#e05252' }} />
+              Share my likes &amp; comments activity with friends
             </label>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>

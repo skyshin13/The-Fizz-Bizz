@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from app.db.database import get_db
-from app.models.models import User, FermentationProject, Friendship
+from app.models.models import User, FermentationProject, Friendship, ProjectLike
 from app.schemas.schemas import UserOut, UserUpdate, PublicUserProfileOut, PublicProjectOut
 from app.api.deps import get_current_user
 
@@ -58,6 +59,47 @@ def get_user_profile(
         )
     ).first()
 
+    liked_projects = []
+    if friendship and friendship.status == "accepted" and user.show_activity_to_friends:
+        likes = (
+            db.query(ProjectLike)
+            .filter(ProjectLike.user_id == user.id)
+            .order_by(ProjectLike.created_at.desc())
+            .limit(20)
+            .all()
+        )
+        liked_ids = [l.project_id for l in likes]
+        if liked_ids:
+            raw_liked = (
+                db.query(FermentationProject)
+                .options(joinedload(FermentationProject.measurements), joinedload(FermentationProject.owner))
+                .filter(
+                    FermentationProject.id.in_(liked_ids),
+                    FermentationProject.user_id != user.id,
+                    or_(
+                        FermentationProject.is_public == True,
+                        FermentationProject.visibility == "everyone",
+                    ),
+                )
+                .all()
+            )
+            liked_projects = [
+                PublicProjectOut(
+                    id=p.id,
+                    user_id=p.user_id,
+                    name=p.name,
+                    fermentation_type=p.fermentation_type,
+                    status=p.status,
+                    description=p.description,
+                    cover_photo_url=p.cover_photo_url,
+                    created_at=p.created_at,
+                    author_username=p.owner.username,
+                    author_display_name=p.owner.display_name,
+                    measurement_count=len(p.measurements),
+                )
+                for p in raw_liked
+            ]
+
     return PublicUserProfileOut(
         id=user.id,
         username=user.username,
@@ -82,6 +124,7 @@ def get_user_profile(
             )
             for p in public_projects
         ],
+        liked_projects=liked_projects,
         friendship_id=friendship.id if friendship else None,
         friendship_status=friendship.status if friendship else None,
         is_requester=friendship.requester_id == current_user.id if friendship else None,

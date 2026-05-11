@@ -58,6 +58,7 @@ class UserOut(UserBase):
     id: int
     avatar_url: Optional[str] = None
     sms_notifications_enabled: bool
+    show_activity_to_friends: bool = False
     created_at: datetime
 
     class Config:
@@ -69,6 +70,7 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     bio: Optional[str] = None
     sms_notifications_enabled: Optional[bool] = None
+    show_activity_to_friends: Optional[bool] = None
     avatar_url: Optional[str] = None
 
 
@@ -596,6 +598,24 @@ class ProjectCommentOut(BaseModel):
         from_attributes = True
 
 
+class FriendInteractionOut(BaseModel):
+    friend_username: str
+    friend_display_name: Optional[str] = None
+    friend_avatar_url: Optional[str] = None
+    action: str
+    at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class FriendActivityProjectOut(PublicProjectOut):
+    friend_interactions: List[FriendInteractionOut] = []
+
+    class Config:
+        from_attributes = True
+
+
 class FriendshipOut(BaseModel):
     id: int
     requester_id: int
@@ -610,6 +630,7 @@ class FriendshipOut(BaseModel):
 
 class PublicUserProfileOut(PublicUserOut):
     public_projects: List[PublicProjectOut] = []
+    liked_projects: List[PublicProjectOut] = []
     friendship_id: Optional[int] = None
     friendship_status: Optional[str] = None
     is_requester: Optional[bool] = None

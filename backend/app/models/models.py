@@ -53,6 +53,7 @@ class User(Base):
     display_name = Column(String)
     phone_number = Column(String)
     sms_notifications_enabled = Column(Boolean, default=False)
+    show_activity_to_friends = Column(Boolean, default=False)
     avatar_url = Column(String)
     bio = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
