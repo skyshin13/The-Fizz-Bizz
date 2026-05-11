@@ -171,7 +171,7 @@ export default function PublicProjectViewPage() {
 
       {/* Header */}
       <div className="fade-in" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.875rem' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.375rem' }}>
           <span style={{ fontSize: '2.5rem', lineHeight: 1 }}>{getEmoji(project.fermentation_type)}</span>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>{project.name}</h1>
@@ -204,7 +204,7 @@ export default function PublicProjectViewPage() {
       {/* Author */}
         <Link
           to={`/profile/${project.author_username}`}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.875rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '10px', textDecoration: 'none', marginTop: '0.75rem' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.875rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '10px', textDecoration: 'none', marginTop: '0.375rem' }}
         >
           {project.author_avatar_url ? (
             <img src={project.author_avatar_url} alt={author} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
@@ -220,7 +220,7 @@ export default function PublicProjectViewPage() {
         </Link>
 
         {/* Like bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.875rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
           <button
             onClick={toggleLike}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: `1px solid ${liked ? '#c4705a' : 'var(--border)'}`, background: liked ? '#c4705a18' : 'transparent', color: liked ? '#c4705a' : 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
