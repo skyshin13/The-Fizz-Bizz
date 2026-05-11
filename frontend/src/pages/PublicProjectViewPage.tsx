@@ -201,26 +201,10 @@ export default function PublicProjectViewPage() {
           </div>
         </div>
 
-        {/* Like bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.75rem' }}>
-          <button
-            onClick={toggleLike}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: `1px solid ${liked ? '#c4705a' : 'var(--border)'}`, background: liked ? '#c4705a18' : 'transparent', color: liked ? '#c4705a' : 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
-          >
-            <Heart size={14} fill={liked ? '#c4705a' : 'none'} /> {likeCount} {likeCount === 1 ? 'like' : 'likes'}
-          </button>
-          <button
-            onClick={() => commentInputRef.current?.focus()}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' }}
-          >
-            <MessageCircle size={14} /> {comments.length} comment{comments.length !== 1 ? 's' : ''}
-          </button>
-        </div>
-
       {/* Author */}
         <Link
           to={`/profile/${project.author_username}`}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.875rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '10px', textDecoration: 'none' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.625rem', padding: '0.5rem 0.875rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '10px', textDecoration: 'none', marginTop: '0.75rem' }}
         >
           {project.author_avatar_url ? (
             <img src={project.author_avatar_url} alt={author} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
@@ -234,6 +218,22 @@ export default function PublicProjectViewPage() {
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@{project.author_username}</div>
           </div>
         </Link>
+
+        {/* Like bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.875rem' }}>
+          <button
+            onClick={toggleLike}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: `1px solid ${liked ? '#c4705a' : 'var(--border)'}`, background: liked ? '#c4705a18' : 'transparent', color: liked ? '#c4705a' : 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
+          >
+            <Heart size={14} fill={liked ? '#c4705a' : 'none'} /> {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+          </button>
+          <button
+            onClick={() => commentInputRef.current?.focus()}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.4rem 0.875rem', borderRadius: '20px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' }}
+          >
+            <MessageCircle size={14} /> {comments.length} comment{comments.length !== 1 ? 's' : ''}
+          </button>
+        </div>
       </div>
 
       {/* Description */}
