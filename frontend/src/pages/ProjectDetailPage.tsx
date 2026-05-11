@@ -1240,7 +1240,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
   const secsSincePoll = lastUpdated ? Math.round((now - lastUpdated.getTime()) / 1000) : null
 
   // Zoom: slice points to the selected window
-  const maxH = points.length > 0 ? points[points.length - 1].hours_elapsed : 0
+  const maxH = points.length > 0 ? Math.max(...points.map(p => p.hours_elapsed)) : 0
   const windowH = viewHours === 'all' ? null : (viewHours === -1 ? (parseFloat(customHours) || 12) : viewHours)
   const minH    = windowH !== null ? Math.max(0, maxH - windowH) : 0
   const visiblePoints = windowH !== null ? points.filter(p => p.hours_elapsed >= minH) : points
