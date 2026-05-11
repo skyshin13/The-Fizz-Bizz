@@ -375,14 +375,14 @@ function PublicProjectCard({
             {getEmoji(project.fermentation_type)}
           </div>
         )}
-        <div style={{ padding: '1rem 1rem 0' }}>
+        <div style={{ padding: '1rem 1rem 0.875rem' }}>
           <div style={{ flex: 1, minWidth: 0, marginBottom: '0.5rem' }}>
             <h3 style={{ fontSize: '0.925rem', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</h3>
             {project.description && (
               <p style={{ fontSize: '0.775rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.description}</p>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '1.1rem' }}>{getEmoji(project.fermentation_type)}</span>
             <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '20px', background: project.status === 'active' ? '#4a674118' : '#3d4e5c18', color: project.status === 'active' ? 'var(--moss)' : 'var(--slate)' }}>
               {project.status}
@@ -391,16 +391,17 @@ function PublicProjectCard({
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{project.measurement_count} readings</span>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            <span>by <strong style={{ color: 'var(--text-secondary)' }}>@{project.author_username}</strong></span>
-            <span>{formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}</span>
-          </div>
         </div>
       </Link>
 
       {/* Interaction area — does not navigate */}
       <div style={{ padding: '0 1rem 1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.875rem', borderTop: '1px solid var(--border-light)', marginBottom: showComments ? '0.75rem' : 0 }}>
+        {/* Author row — sits directly above the like/comment bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', paddingBottom: '0.75rem' }}>
+          <span>by <strong style={{ color: 'var(--text-secondary)' }}>@{project.author_username}</strong></span>
+          <span>{formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-light)', marginBottom: showComments ? '0.75rem' : 0 }}>
           <button
             onClick={handleLike}
             style={{
