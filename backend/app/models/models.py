@@ -53,6 +53,7 @@ class User(Base):
     display_name = Column(String)
     phone_number = Column(String)
     sms_notifications_enabled = Column(Boolean, default=False)
+    email_notifications_enabled = Column(Boolean, default=False)
     show_activity_to_friends = Column(Boolean, default=False)
     avatar_url = Column(String)
     bio = Column(Text)
@@ -168,6 +169,7 @@ class Reminder(Base):
     preferred_minute = Column(Integer, nullable=True)  # 0-59
     is_active = Column(Boolean, default=True)
     sms_enabled = Column(Boolean, default=False)
+    email_enabled = Column(Boolean, default=False)
     phone_number = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

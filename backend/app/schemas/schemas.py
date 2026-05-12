@@ -58,6 +58,7 @@ class UserOut(UserBase):
     id: int
     avatar_url: Optional[str] = None
     sms_notifications_enabled: bool
+    email_notifications_enabled: bool = False
     show_activity_to_friends: bool = False
     created_at: datetime
 
@@ -70,6 +71,7 @@ class UserUpdate(BaseModel):
     phone_number: Optional[str] = None
     bio: Optional[str] = None
     sms_notifications_enabled: Optional[bool] = None
+    email_notifications_enabled: Optional[bool] = None
     show_activity_to_friends: Optional[bool] = None
     avatar_url: Optional[str] = None
 
@@ -133,6 +135,7 @@ class ReminderCreate(BaseModel):
     message: str
     interval_hours: int
     sms_enabled: bool = False
+    email_enabled: bool = False
     phone_number: Optional[str] = None
     preferred_hour: Optional[int] = None    # 0-23
     preferred_minute: Optional[int] = None  # 0-59

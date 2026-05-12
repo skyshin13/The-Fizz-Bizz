@@ -5,6 +5,7 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 from app.db.database import get_db
 from app.services.twilio_service import send_sms
+from app.services.sendgrid_service import send_email
 from app.models.models import (
     FermentationProject, MeasurementLog, ObservationNote, ProjectPhoto,
     Reminder, User, ProjectYeastConnection, YeastProfile, ProjectCERState,
@@ -311,7 +312,7 @@ def add_measurement(
             Reminder.project_id == project_id,
             Reminder.reminder_type == 'co2_limit',
             Reminder.is_active == True,
-            Reminder.sms_enabled == True,
+            or_(Reminder.sms_enabled == True, Reminder.email_enabled == True),
         ).all()
         for alert in co2_alerts:
             threshold_psi = alert.interval_hours  # stores PSI threshold for co2_limit type
@@ -319,13 +320,21 @@ def add_measurement(
             if triggered_at and triggered_at.replace(tzinfo=timezone.utc) > now:
                 continue  # still in cooldown
             if body.co2_psi >= threshold_psi:
-                phone = alert.phone_number or current_user.phone_number
-                if phone:
-                    send_sms(phone, (
-                        f'Fizz Bizz CO₂ alert for "{project.name}": '
-                        f'PSI reading of {body.co2_psi:.1f} has reached your alert threshold of '
-                        f'{threshold_psi} PSI. Consider venting your vessel.'
-                    ))
+                co2_msg = (
+                    f'Fizz Bizz CO₂ alert for "{project.name}": '
+                    f'PSI reading of {body.co2_psi:.1f} has reached your alert threshold of '
+                    f'{threshold_psi} PSI. Consider venting your vessel.'
+                )
+                if alert.sms_enabled:
+                    phone = alert.phone_number or current_user.phone_number
+                    if phone:
+                        send_sms(phone, co2_msg)
+                if alert.email_enabled and current_user.email:
+                    send_email(
+                        current_user.email,
+                        f'Fizz Bizz CO₂ Alert — {project.name}',
+                        co2_msg,
+                    )
                 alert.next_trigger_at = now + timedelta(hours=4)
         db.commit()
 
@@ -539,15 +548,19 @@ def add_comment(
     db.commit()
     db.refresh(comment)
 
-    # Notify the parent comment's author via SMS if they have it enabled
+    # Notify the parent comment's author via SMS and/or email if they have it enabled
     if parent and parent.user_id != current_user.id:
         parent_author = db.query(User).filter_by(id=parent.user_id).first()
-        if parent_author and parent_author.sms_notifications_enabled and parent_author.phone_number:
-            from app.services.twilio_service import send_sms
-            send_sms(
-                parent_author.phone_number,
-                f"@{current_user.username} replied to your comment on \"{project.name}\": {body.content.strip()[:100]}",
-            )
+        if parent_author:
+            reply_msg = f"@{current_user.username} replied to your comment on \"{project.name}\": {body.content.strip()[:100]}"
+            if parent_author.sms_notifications_enabled and parent_author.phone_number:
+                send_sms(parent_author.phone_number, reply_msg)
+            if parent_author.email_notifications_enabled and parent_author.email:
+                send_email(
+                    parent_author.email,
+                    f'New reply on Fizz Bizz — {project.name}',
+                    reply_msg,
+                )
 
     return ProjectCommentOut(
         id=comment.id,

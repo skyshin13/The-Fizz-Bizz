@@ -1,13 +1,15 @@
 """
-Background task that fires scheduled SMS reminders automatically.
-Runs every 60 seconds, checks for due reminders, sends SMS, and advances next_trigger_at.
+Background task that fires scheduled reminders (SMS and/or email) automatically.
+Runs every 60 seconds, checks for due reminders, notifies, and advances next_trigger_at.
 """
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from sqlalchemy import or_
 from app.db.database import SessionLocal
 from app.models.models import Reminder, FermentationProject, User
 from app.services.twilio_service import send_sms
+from app.services.sendgrid_service import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ async def reminder_loop():
             now = datetime.now(timezone.utc)
             due = db.query(Reminder).filter(
                 Reminder.is_active == True,
-                Reminder.sms_enabled == True,
+                or_(Reminder.sms_enabled == True, Reminder.email_enabled == True),
                 Reminder.next_trigger_at != None,
                 Reminder.next_trigger_at <= now,
                 Reminder.reminder_type != 'co2_limit',
@@ -45,12 +47,21 @@ async def reminder_loop():
                         FermentationProject.id == reminder.project_id
                     ).first()
                     user = db.query(User).filter(User.id == reminder.user_id).first()
-                    phone = reminder.phone_number or (user.phone_number if user else None)
 
-                    if phone and project:
+                    if project:
                         msg = f'Fizz Bizz reminder for "{project.name}": {reminder.message}'
-                        send_sms(phone, msg)
-                        logger.info(f"Sent reminder {reminder.id} to {phone}")
+
+                        if reminder.sms_enabled:
+                            phone = reminder.phone_number or (user.phone_number if user else None)
+                            if phone:
+                                send_sms(phone, msg)
+
+                        if reminder.email_enabled and user and user.email:
+                            send_email(
+                                user.email,
+                                f'Fizz Bizz Reminder: {project.name}',
+                                msg,
+                            )
 
                     reminder.next_trigger_at = _next_trigger(reminder, now)
                 except Exception as e:

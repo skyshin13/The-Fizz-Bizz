@@ -12,6 +12,7 @@ from pydantic import BaseModel
 class ReminderUpdate(BaseModel):
     is_active: Optional[bool] = None
     sms_enabled: Optional[bool] = None
+    email_enabled: Optional[bool] = None
     interval_hours: Optional[int] = None
     message: Optional[str] = None
     phone_number: Optional[str] = None
@@ -101,6 +102,7 @@ def create_reminder(
         preferred_hour=body.preferred_hour,
         preferred_minute=body.preferred_minute,
         sms_enabled=body.sms_enabled,
+        email_enabled=body.email_enabled,
         phone_number=phone,
         is_active=True,
     )
