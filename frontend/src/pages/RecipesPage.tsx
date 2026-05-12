@@ -176,8 +176,8 @@ function RecipeCard({ recipe, isSelected, onSelect, getEmoji }: {
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
         <span style={{ fontSize: '2.25rem', flexShrink: 0 }}>{getEmoji(recipe.fermentation_type)}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-            <h3 style={{ fontSize: '0.95rem' }}>{recipe.name}</h3>
+          <div style={{ marginBottom: '0.25rem' }}>
+            <h3 style={{ fontSize: '0.95rem', marginBottom: '0.2rem' }}>{recipe.name}</h3>
             {recipe.difficulty && (
               <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', borderRadius: '20px', background: `${DIFF_COLOR[recipe.difficulty]}18`, color: DIFF_COLOR[recipe.difficulty] }}>
                 {recipe.difficulty}
