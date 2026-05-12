@@ -487,7 +487,7 @@ export default function ProjectDetailPage() {
               ))}
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
               {(() => {
@@ -511,6 +511,8 @@ export default function ProjectDetailPage() {
               <YAxis
                 tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
                 domain={activeChart === 'ph' ? [0, 14] : ['auto', 'auto']}
+                ticks={activeChart === 'ph' ? [0, 2, 4, 6, 8, 10, 12, 14] : undefined}
+                tickCount={activeChart === 'gravity' ? 6 : undefined}
                 tickFormatter={v => activeChart === 'gravity' ? v.toFixed(3) : v}
               />
               <Tooltip
@@ -1498,7 +1500,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
           )}
 
           {!loading && points.length > 0 && (
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={300}>
               <LineChart key={`cer-${windowH}-${minH}`} data={mergedChartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
@@ -1517,6 +1519,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
                 />
                 <YAxis
                   tick={{ fontSize: '0.68rem', fill: 'var(--text-muted)' }}
+                  tickCount={6}
                   label={{ value: 'PSI', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: '0.68rem', fill: 'var(--text-muted)' } }}
                 />
                 <Tooltip
@@ -1675,11 +1678,11 @@ function KefirCO2Section({ fermentationTempCelsius, startDate }: { fermentationT
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-          <XAxis dataKey="hours" type="number" domain={[0, 30]} tickFormatter={v => `${v}h`} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-          <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickFormatter={v => v.toFixed(2)} domain={[0, 'auto']} />
+          <XAxis dataKey="hours" type="number" domain={[0, 30]} ticks={[0, 5, 10, 15, 20, 25, 30]} tickFormatter={v => `${v}h`} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+          <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickFormatter={v => v.toFixed(2)} domain={[0, 'auto']} tickCount={6} />
           <Tooltip
             contentStyle={{ fontFamily: 'DM Sans', fontSize: 12, border: '1px solid var(--border)', borderRadius: 8 }}
             formatter={(v: number) => [`${v.toFixed(4)} g/L`, 'Dissolved CO₂']}
