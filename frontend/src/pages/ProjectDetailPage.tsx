@@ -1777,12 +1777,12 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
     const defaultPsi = cerThreshold || '10'
     const fmtTime = (h?: number | null, m?: number | null) =>
       h != null ? `${String(h).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}` : ''
-    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, psi_threshold: defaultPsi, preferred_time: '' }
+    if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, email_enabled: false, psi_threshold: defaultPsi, preferred_time: '' }
     if (existing.reminder_type === 'co2_limit') {
-      return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, psi_threshold: String(existing.interval_hours), preferred_time: '' }
+      return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, email_enabled: existing.email_enabled, psi_threshold: String(existing.interval_hours), preferred_time: '' }
     }
     const { count, unit } = hoursToUnit(existing.interval_hours)
-    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, psi_threshold: defaultPsi, preferred_time: fmtTime(existing.preferred_hour, existing.preferred_minute) }
+    return { reminder_type: existing.reminder_type, interval_count: count, interval_unit: unit, sms_enabled: existing.sms_enabled, email_enabled: existing.email_enabled, psi_threshold: defaultPsi, preferred_time: fmtTime(existing.preferred_hour, existing.preferred_minute) }
   }
 
   const [form, setForm] = useState(initFromExisting)
@@ -1816,6 +1816,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
         await api.patch(`/reminders/${existing.id}`, {
           interval_hours,
           sms_enabled: form.sms_enabled,
+          email_enabled: form.email_enabled,
           message: preset.defaultMsg,
           ...(supportsTime ? { preferred_hour, preferred_minute } : {}),
         })
@@ -1826,6 +1827,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
           message: preset.defaultMsg,
           interval_hours,
           sms_enabled: form.sms_enabled,
+          email_enabled: form.email_enabled,
           phone_number: form.sms_enabled ? (user?.phone_number || undefined) : undefined,
           ...(supportsTime ? { preferred_hour, preferred_minute } : {}),
         })
@@ -1881,7 +1883,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
               <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>PSI</span>
             </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-              You'll get an SMS whenever a CO₂ PSI reading meets or exceeds this value. Alerts repeat at most once every 4 hours.
+              You'll be notified whenever a CO₂ PSI reading meets or exceeds this value. Alerts repeat at most once every 4 hours.
             </p>
           </div>
         ) : (
@@ -1928,21 +1930,35 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
           </div>
         )}
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer', marginBottom: '1.5rem' }}>
-          <input
-            type="checkbox"
-            checked={form.sms_enabled}
-            onChange={e => setForm(prev => ({ ...prev, sms_enabled: e.target.checked }))}
-            style={{ width: 16, height: 16, accentColor: 'var(--moss)', cursor: 'pointer' }}
-          />
-          <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>📱 SMS reminders</div>
-            {user?.phone_number
-              ? <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Text sent to {user.phone_number}</div>
-              : <div style={{ fontSize: '0.72rem', color: 'var(--amber)' }}>Add a phone number in your profile to enable</div>
-            }
-          </div>
-        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={form.sms_enabled}
+              onChange={e => setForm(prev => ({ ...prev, sms_enabled: e.target.checked }))}
+              style={{ width: 16, height: 16, accentColor: 'var(--moss)', cursor: 'pointer' }}
+            />
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>📱 SMS reminders</div>
+              {user?.phone_number
+                ? <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Text sent to {user.phone_number}</div>
+                : <div style={{ fontSize: '0.72rem', color: 'var(--amber)' }}>Add a phone number in your profile to enable</div>
+              }
+            </div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={form.email_enabled}
+              onChange={e => setForm(prev => ({ ...prev, email_enabled: e.target.checked }))}
+              style={{ width: 16, height: 16, accentColor: 'var(--moss)', cursor: 'pointer' }}
+            />
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>✉️ Email reminders</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Sent to your account email via SendGrid</div>
+            </div>
+          </label>
+        </div>
 
         <ModalFooter onClose={onClose} loading={loading} submitLabel={existing ? 'Save Changes' : 'Create Reminder'} />
       </form>

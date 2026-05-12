@@ -187,6 +187,7 @@ export interface Reminder {
   preferred_minute?: number | null
   is_active: boolean
   sms_enabled: boolean
+  email_enabled: boolean
   phone_number?: string
   created_at: string
 }
