@@ -1953,10 +1953,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
               onChange={e => setForm(prev => ({ ...prev, email_enabled: e.target.checked }))}
               style={{ width: 16, height: 16, accentColor: 'var(--moss)', cursor: 'pointer' }}
             />
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>✉️ Email reminders</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Sent to your account email via SendGrid</div>
-            </div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>✉️ Email reminders</div>
           </label>
         </div>
 
