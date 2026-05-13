@@ -115,7 +115,7 @@ export default function RecipesPage() {
       ) : selected ? (
         /* Split view: list + detail panel */
         <div className={`fade-in-delay-1 ${styles.layout}`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className={styles.listColumn} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {filtered.map(recipe => (
               <RecipeCard
                 key={recipe.id}
@@ -126,7 +126,7 @@ export default function RecipesPage() {
               />
             ))}
           </div>
-          <RecipeDetail recipe={selected} getEmoji={getEmoji} />
+          <RecipeDetail recipe={selected} getEmoji={getEmoji} onBack={() => setSelected(null)} />
         </div>
       ) : filtered.length === 0 ? (
         <div className="fade-in-delay-1" style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--card-bg)', borderRadius: '12px', border: '1px dashed var(--border-light)', color: 'var(--text-muted)' }}>
@@ -207,10 +207,11 @@ function RecipeCard({ recipe, isSelected, onSelect, getEmoji }: {
 }
 
 /* ── Detail panel ── */
-function RecipeDetail({ recipe, getEmoji }: { recipe: Recipe; getEmoji: (type: string) => string }) {
+function RecipeDetail({ recipe, getEmoji, onBack }: { recipe: Recipe; getEmoji: (type: string) => string; onBack: () => void }) {
   const navigate = useNavigate()
   return (
     <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--amber)', position: 'sticky', top: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
+      <button className={styles.backBtn} onClick={onBack}>← Back to recipes</button>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <span style={{ fontSize: '2.5rem' }}>{getEmoji(recipe.fermentation_type)}</span>
         <div>
