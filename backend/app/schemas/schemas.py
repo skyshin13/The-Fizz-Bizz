@@ -21,6 +21,23 @@ def _coerce_fermentation_type(v):
     return v
 
 
+def _coerce_project_status(v):
+    """Accept both uppercase enum names ('ACTIVE') and lowercase values ('active')."""
+    if isinstance(v, ProjectStatus):
+        return v
+    if isinstance(v, str):
+        low = v.lower()
+        try:
+            return ProjectStatus(low)
+        except ValueError:
+            pass
+        try:
+            return ProjectStatus[v.upper()]
+        except KeyError:
+            pass
+    return v
+
+
 # ─── Auth Schemas ───────────────────────────────────────────────────────────
 
 class UserRegister(BaseModel):
@@ -225,11 +242,15 @@ class ProjectOut(BaseModel):
     user_id: int
     name: str
     fermentation_type: FermentationType
+    status: ProjectStatus
 
     @field_validator('fermentation_type', mode='before')
     @classmethod
     def normalise_type(cls, v): return _coerce_fermentation_type(v)
-    status: ProjectStatus
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalise_status(cls, v): return _coerce_project_status(v)
     description: Optional[str] = None
     batch_size_liters: Optional[float] = None
     start_date: Optional[datetime] = None
@@ -516,6 +537,14 @@ class PublicProjectOut(BaseModel):
     name: str
     fermentation_type: FermentationType
     status: ProjectStatus
+
+    @field_validator('fermentation_type', mode='before')
+    @classmethod
+    def normalise_type(cls, v): return _coerce_fermentation_type(v)
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalise_status(cls, v): return _coerce_project_status(v)
     description: Optional[str] = None
     cover_photo_url: Optional[str] = None
     created_at: datetime
@@ -580,6 +609,14 @@ class PublicProjectDetailOut(BaseModel):
     name: str
     fermentation_type: FermentationType
     status: ProjectStatus
+
+    @field_validator('fermentation_type', mode='before')
+    @classmethod
+    def normalise_type(cls, v): return _coerce_fermentation_type(v)
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalise_status(cls, v): return _coerce_project_status(v)
     description: Optional[str] = None
     notes: Optional[str] = None
     cover_photo_url: Optional[str] = None

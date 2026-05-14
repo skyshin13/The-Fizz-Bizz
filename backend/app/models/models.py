@@ -79,7 +79,7 @@ class FermentationProject(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     fermentation_type = Column(SAEnum(FermentationType, native_enum=False), nullable=False, index=True)
-    status = Column(SAEnum(ProjectStatus), default=ProjectStatus.ACTIVE, index=True)
+    status = Column(SAEnum(ProjectStatus, native_enum=False), default=ProjectStatus.ACTIVE, index=True)
     description = Column(Text)
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=True)
     batch_size_liters = Column(Float)
