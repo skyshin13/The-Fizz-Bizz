@@ -2001,16 +2001,13 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
 
         {!isCO2(form.reminder_type) && (
           <div style={{ marginBottom: '1rem' }}>
-            <label style={lStyle}>First reminder at <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <label style={lStyle}>Set time <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
             <input
               type="time"
               value={form.preferred_time}
               onChange={e => setForm(prev => ({ ...prev, preferred_time: e.target.value }))}
               style={{ ...iStyle, width: 'auto' }}
             />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-              Fires at this time today (or tomorrow if it's already passed), then repeats every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''}.
-            </p>
           </div>
         )}
 
