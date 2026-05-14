@@ -782,8 +782,7 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Community — likes & comments from other users */}
-      {(project.visibility === 'everyone' || project.is_public) && (
-        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', marginTop: '2rem' }}>
+      <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', marginTop: '2rem' }}>
           <div style={{ borderBottom: '1px solid var(--border-light)', padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Community</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -910,7 +909,7 @@ export default function ProjectDetailPage() {
             </form>
           </div>
         </div>
-      )}
+      </div>
 
       {showMeasure && <MeasurementModal projectId={project.id} isAlcohol={isAlcohol} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
       {showNote && <NoteModal projectId={project.id} onClose={() => setShowNote(false)} onAdded={() => { setShowNote(false); load() }} />}
