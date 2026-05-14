@@ -78,8 +78,8 @@ class FermentationProject(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
-    fermentation_type = Column(SAEnum(FermentationType, native_enum=False), nullable=False, index=True)
-    status = Column(SAEnum(ProjectStatus, native_enum=False), default=ProjectStatus.ACTIVE, index=True)
+    fermentation_type = Column(String, nullable=False, index=True)
+    status = Column(String, default=ProjectStatus.ACTIVE, index=True)
     description = Column(Text)
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=True)
     batch_size_liters = Column(Float)
@@ -186,7 +186,7 @@ class YeastProfile(Base):
     strain_code = Column(String)      # e.g. "WLP001", "Safale US-05"
     brand = Column(String)            # e.g. "White Labs", "Fermentis"
     yeast_type = Column(String)       # "ale", "lager", "wine", "bread", "wild", "SCOBY"
-    fermentation_type = Column(SAEnum(FermentationType, native_enum=False))
+    fermentation_type = Column(String)
     description = Column(Text)
     attenuation_min = Column(Float)   # % fermentable sugars consumed
     attenuation_max = Column(Float)
@@ -226,7 +226,7 @@ class Recipe(Base):
     id = Column(Integer, primary_key=True, index=True)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
-    fermentation_type = Column(SAEnum(FermentationType, native_enum=False), nullable=False)
+    fermentation_type = Column(String, nullable=False)
     description = Column(Text)
     difficulty = Column(String)       # "beginner", "intermediate", "advanced"
     batch_size_liters = Column(Float)
