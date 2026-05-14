@@ -1,7 +1,24 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, List, Any
 from datetime import datetime
 from app.models.models import FermentationType, ProjectStatus, ProjectVisibility
+
+
+def _coerce_fermentation_type(v):
+    """Accept both uppercase enum names ('BEER') and lowercase values ('beer')."""
+    if isinstance(v, FermentationType):
+        return v
+    if isinstance(v, str):
+        low = v.lower()
+        try:
+            return FermentationType(low)
+        except ValueError:
+            pass
+        try:
+            return FermentationType[v.upper()]
+        except KeyError:
+            pass
+    return v
 
 
 # ─── Auth Schemas ───────────────────────────────────────────────────────────
@@ -169,6 +186,10 @@ class ProjectYeastOut(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     fermentation_type: FermentationType
+
+    @field_validator('fermentation_type', mode='before')
+    @classmethod
+    def normalise_type(cls, v): return _coerce_fermentation_type(v)
     description: Optional[str] = None
     recipe_id: Optional[int] = None
     batch_size_liters: Optional[float] = None
@@ -204,6 +225,10 @@ class ProjectOut(BaseModel):
     user_id: int
     name: str
     fermentation_type: FermentationType
+
+    @field_validator('fermentation_type', mode='before')
+    @classmethod
+    def normalise_type(cls, v): return _coerce_fermentation_type(v)
     status: ProjectStatus
     description: Optional[str] = None
     batch_size_liters: Optional[float] = None
