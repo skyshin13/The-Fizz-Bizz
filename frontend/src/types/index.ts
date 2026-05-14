@@ -103,6 +103,9 @@ export interface Project {
   measurements: Measurement[]
   observations: Observation[]
   yeast_strain?: ProjectYeastStrain
+  like_count: number
+  is_liked_by_me: boolean
+  comment_count: number
 }
 
 export interface PublicUser {

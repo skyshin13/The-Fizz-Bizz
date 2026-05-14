@@ -175,6 +175,9 @@ def get_project(
     )
     project.__dict__['measurements'] = user_measurements
     _attach_yeast_strain(project, db)
+    project.__dict__['like_count'] = db.query(ProjectLike).filter_by(project_id=project_id).count()
+    project.__dict__['is_liked_by_me'] = db.query(ProjectLike).filter_by(project_id=project_id, user_id=current_user.id).first() is not None
+    project.__dict__['comment_count'] = db.query(ProjectComment).filter_by(project_id=project_id).count()
     return project
 
 

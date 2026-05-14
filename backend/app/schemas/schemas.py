@@ -271,6 +271,9 @@ class ProjectOut(BaseModel):
     measurements: List[MeasurementOut] = []
     observations: List[ObservationOut] = []
     yeast_strain: Optional[ProjectYeastOut] = None
+    like_count: int = 0
+    is_liked_by_me: bool = False
+    comment_count: int = 0
 
     class Config:
         from_attributes = True

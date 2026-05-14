@@ -6,7 +6,9 @@ import { Project, Reminder } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2, Globe, Lock } from 'lucide-react'
+import { ArrowLeft, Plus, FlaskConical, Thermometer, Droplets, Activity, BookOpen, Camera, X, ImagePlus, ChevronLeft, ChevronRight, CheckCircle, Bell, BellOff, Trash2, Pencil, Check, Wind, AlertTriangle, Search, Info, Share2, Globe, Lock, Heart, MessageCircle, Send } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { ProjectComment } from '../types'
 import styles from './ProjectDetailPage.module.css'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -39,11 +41,23 @@ export default function ProjectDetailPage() {
   const [yeastDropdown, setYeastDropdown] = useState(false)
   const [descSelectedYeast, setDescSelectedYeast] = useState<{ id: number; name: string; strain_code?: string; brand?: string } | null | undefined>(undefined)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [comments, setComments] = useState<ProjectComment[]>([])
+  const [commentText, setCommentText] = useState('')
+  const [submittingComment, setSubmittingComment] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [isLikedByMe, setIsLikedByMe] = useState(false)
+  const [replyingToId, setReplyingToId] = useState<number | null>(null)
+  const [replyTexts, setReplyTexts] = useState<Record<number, string>>({})
   const coverInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const { getEmoji } = useFermentationTypes()
 
-  const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).finally(() => setLoading(false))
+  const load = () => api.get(`/projects/${id}`).then(r => {
+    setProject(r.data)
+    setLikeCount(r.data.like_count ?? 0)
+    setIsLikedByMe(r.data.is_liked_by_me ?? false)
+  }).finally(() => setLoading(false))
+  const loadComments = () => api.get(`/projects/${id}/comments`).then(r => setComments(r.data)).catch(() => {})
   const loadReminders = () => api.get(`/projects/${id}/reminders`).then(r => setReminders(r.data)).catch(() => {})
   const deleteReminder = async (reminderId: number) => {
     await api.delete(`/reminders/${reminderId}`)
@@ -83,7 +97,7 @@ export default function ProjectDetailPage() {
   }
 
   useEffect(() => {
-    load(); loadReminders()
+    load(); loadReminders(); loadComments()
     const interval = setInterval(load, 30000)
     return () => clearInterval(interval)
   }, [id])
@@ -763,6 +777,137 @@ export default function ProjectDetailPage() {
                 value={`${project.yeast_strain.name}${project.yeast_strain.strain_code ? ` (${project.yeast_strain.strain_code})` : ''}${project.yeast_strain.brand ? ` · ${project.yeast_strain.brand}` : ''}`}
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Community — likes & comments from other users */}
+      {(project.visibility === 'everyone' || project.is_public) && (
+        <div className="fade-in-delay-2" style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden', marginTop: '2rem' }}>
+          <div style={{ borderBottom: '1px solid var(--border-light)', padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Community</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button
+                onClick={async () => {
+                  try {
+                    if (isLikedByMe) {
+                      await api.delete(`/projects/${project.id}/like`)
+                      setLikeCount(c => c - 1)
+                      setIsLikedByMe(false)
+                    } else {
+                      await api.post(`/projects/${project.id}/like`)
+                      setLikeCount(c => c + 1)
+                      setIsLikedByMe(true)
+                    }
+                  } catch { toast.error('Failed to update like') }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  background: 'none', padding: '0.3rem 0.75rem', borderRadius: '20px',
+                  color: isLikedByMe ? '#e05252' : 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600,
+                  border: `1px solid ${isLikedByMe ? '#e0525240' : 'var(--border-light)'}`,
+                }}
+              >
+                <Heart size={14} fill={isLikedByMe ? '#e05252' : 'none'} />
+                {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+              </button>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <MessageCircle size={14} />
+                {comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0)} comments
+              </span>
+            </div>
+          </div>
+          <div style={{ padding: '1.5rem' }}>
+            {/* Comment list */}
+            {comments.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>No comments yet. Share this project so others can leave feedback!</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {comments.map(c => (
+                  <div key={c.id}>
+                    <div style={{ background: 'var(--parchment)', borderRadius: '8px', padding: '0.625rem 0.875rem', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <div>
+                          <span style={{ fontWeight: 700, color: 'var(--brown-dark)', marginRight: '0.4rem' }}>@{c.author_username}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{c.content}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
+                          <button
+                            onClick={() => { setReplyingToId(replyingToId === c.id ? null : c.id); setReplyTexts(p => ({ ...p, [c.id]: `@${c.author_username} ` })) }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.7rem', padding: 0 }}
+                          >Reply</button>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Replies */}
+                    {(c.replies ?? []).map(reply => (
+                      <div key={reply.id} style={{ marginLeft: '1.25rem', marginTop: '0.3rem', background: 'var(--warm-white)', borderRadius: '7px', padding: '0.5rem 0.75rem', fontSize: '0.8rem', lineHeight: 1.4, border: '1px solid var(--border-light)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--brown-dark)', marginRight: '0.4rem' }}>@{reply.author_username}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{reply.content}</span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}</span>
+                      </div>
+                    ))}
+                    {/* Reply input */}
+                    {replyingToId === c.id && (
+                      <form
+                        onSubmit={async e => {
+                          e.preventDefault()
+                          const text = (replyTexts[c.id] ?? '').trim()
+                          if (!text) return
+                          try {
+                            await api.post(`/projects/${project.id}/comments`, { content: text, parent_id: c.id })
+                            await loadComments()
+                            setReplyingToId(null)
+                            setReplyTexts(p => ({ ...p, [c.id]: '' }))
+                          } catch { toast.error('Failed to post reply') }
+                        }}
+                        style={{ marginLeft: '1.25rem', marginTop: '0.3rem', display: 'flex', gap: '0.5rem' }}
+                      >
+                        <input
+                          autoFocus
+                          value={replyTexts[c.id] ?? ''}
+                          onChange={e => setReplyTexts(p => ({ ...p, [c.id]: e.target.value }))}
+                          placeholder="Write a reply..."
+                          style={{ flex: 1, padding: '0.4rem 0.625rem', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.8rem', background: 'var(--input-bg)' }}
+                        />
+                        <button type="submit" style={{ padding: '0.4rem 0.75rem', borderRadius: '6px', background: 'var(--amber)', color: 'var(--brown-dark)', fontSize: '0.8rem', fontWeight: 600 }}>Reply</button>
+                        <button type="button" onClick={() => setReplyingToId(null)} style={{ padding: '0.4rem 0.5rem', borderRadius: '6px', background: 'none', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cancel</button>
+                      </form>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* New comment input */}
+            <form
+              onSubmit={async e => {
+                e.preventDefault()
+                if (!commentText.trim()) return
+                setSubmittingComment(true)
+                try {
+                  await api.post(`/projects/${project.id}/comments`, { content: commentText.trim() })
+                  setCommentText('')
+                  await loadComments()
+                } catch { toast.error('Failed to post comment') }
+                setSubmittingComment(false)
+              }}
+              style={{ display: 'flex', gap: '0.625rem' }}
+            >
+              <input
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="Add a comment..."
+                style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.85rem', background: 'var(--input-bg)' }}
+              />
+              <button
+                type="submit"
+                disabled={submittingComment || !commentText.trim()}
+                style={{ padding: '0.5rem 0.875rem', borderRadius: '8px', background: 'var(--amber)', color: 'var(--brown-dark)', fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', opacity: (!commentText.trim() || submittingComment) ? 0.5 : 1 }}
+              >
+                <Send size={13} /> Post
+              </button>
+            </form>
           </div>
         </div>
       )}
