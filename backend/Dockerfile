@@ -8,7 +8,9 @@ COPY requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
 
 COPY app/ ./app/
+COPY docker_start.sh .
+RUN chmod +x docker_start.sh
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["/app/docker_start.sh"]
