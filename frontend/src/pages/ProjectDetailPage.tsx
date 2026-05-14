@@ -603,7 +603,7 @@ export default function ProjectDetailPage() {
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No notes yet.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.75rem' }}>
-                  {project.observations.slice().reverse().map(obs => (
+                  {project.observations.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map(obs => (
                     <ObservationRow key={obs.id} obs={obs} projectId={String(project.id)} onSaved={load} />
                   ))}
                 </div>
