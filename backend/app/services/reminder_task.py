@@ -22,14 +22,12 @@ def _next_trigger(reminder: Reminder, now: datetime) -> datetime:
     """Compute the next trigger time after a reminder fires."""
     if reminder.preferred_hour is not None:
         minute = reminder.preferred_minute or 0
+        # preferred_hour is stored in UTC (frontend converts local → UTC before sending)
         base = now + timedelta(hours=reminder.interval_hours)
-        base_local = base.astimezone(_EST)
-        candidate_local = base_local.replace(
-            hour=reminder.preferred_hour, minute=minute, second=0, microsecond=0
-        )
-        if candidate_local < base_local - timedelta(hours=1):
-            candidate_local += timedelta(days=1)
-        return candidate_local.astimezone(timezone.utc)
+        candidate = base.replace(hour=reminder.preferred_hour, minute=minute, second=0, microsecond=0)
+        if candidate < base - timedelta(hours=1):
+            candidate += timedelta(days=1)
+        return candidate
     return now + timedelta(hours=reminder.interval_hours)
 
 
