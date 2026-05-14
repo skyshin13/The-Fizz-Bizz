@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import api from '../lib/api'
 import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
@@ -38,7 +38,7 @@ export default function CalculatorsPage() {
   )
 }
 
-// â”€â”€â”€ ABV Calculator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- ABV Calculator -----------------------------------------------------------
 
 function ABVCalculator() {
   const [og, setOg] = useState('1.054')
@@ -66,7 +66,7 @@ function ABVCalculator() {
       <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.75rem', border: '1px solid var(--border-light)' }}>
         <h2 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>ABV Calculator</h2>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-          Uses the Standard Homebrew ABV formula: (OG âˆ’ FG) Ã— 131.25. For high-gravity brews (OG &gt; 1.060), a more accurate formula is applied automatically.
+          Uses the Standard Homebrew ABV formula: (OG − FG) × 131.25. For high-gravity brews (OG &gt; 1.060), a more accurate formula is applied automatically.
         </p>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -94,10 +94,10 @@ function ABVCalculator() {
             <ResultCard label="Approx. Calories (12 oz)" value={`${result.calories_per_12oz} kcal`} color="var(--slate)" />
 
             <div style={{ padding: '0.875rem', background: 'var(--parchment)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              <strong>OG:</strong> {og} â†’ <strong>FG:</strong> {fg}<br />
-              {result.abv_percent < 2 ? 'ðŸµ Low-alcohol / probiotic range' :
-               result.abv_percent < 5 ? 'ðŸº Session strength' :
-               result.abv_percent < 8 ? 'ðŸº Standard strength' : 'ðŸ¥ƒ High gravity'}
+              <strong>OG:</strong> {og} → <strong>FG:</strong> {fg}<br />
+              {result.abv_percent < 2 ? '🍵 Low-alcohol / probiotic range' :
+               result.abv_percent < 5 ? '🍺 Session strength' :
+               result.abv_percent < 8 ? '🍺 Standard strength' : '🥃 High gravity'}
             </div>
           </div>
         ) : (
@@ -111,7 +111,7 @@ function ABVCalculator() {
   )
 }
 
-// â”€â”€â”€ Priming Sugar Calculator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Priming Sugar Calculator ────────────────────────────────────────────────
 
 function PrimingSugarCalculator() {
   const { sugarTypes } = useSugarTypes()
@@ -151,7 +151,7 @@ function PrimingSugarCalculator() {
       <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.75rem', border: '1px solid var(--border-light)' }}>
         <h2 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Priming Sugar Calculator</h2>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-          Calculate how much sugar to add for bottle carbonation. Factors in dissolved COâ‚‚ at your fermentation temperature.
+          Calculate how much sugar to add for bottle carbonation. Factors in dissolved CO₂ at your fermentation temperature.
         </p>
 
         <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -164,12 +164,12 @@ function PrimingSugarCalculator() {
             <input type="number" step="0.001" value={form.current_gravity} onChange={set('current_gravity')} style={iStyle} />
           </div>
           <div>
-            <label style={lStyle}>Target COâ‚‚ Volumes</label>
+            <label style={lStyle}>Target CO₂ Volumes</label>
             <input type="number" step="0.1" value={form.target_co2_volumes} onChange={set('target_co2_volumes')} style={iStyle} />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>Beer: 2.4, Kombucha/soda: 3.0â€“3.5, Lager: 2.5</p>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>Beer: 2.4, Kombucha/soda: 3.0–3.5, Lager: 2.5</p>
           </div>
           <div>
-            <label style={lStyle}>Fermentation Temp (Â°F)</label>
+            <label style={lStyle}>Fermentation Temp (°F)</label>
             <input type="number" step="1" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} style={iStyle} />
           </div>
           <div>
@@ -196,7 +196,7 @@ function PrimingSugarCalculator() {
               <strong>Instructions:</strong><br />{result.notes}
             </div>
             <div style={{ padding: '0.875rem', background: '#b54a2c12', border: '1px solid #b54a2c30', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--rust)', lineHeight: 1.6 }}>
-              âš ï¸ Always leave 2" headspace in bottles. Open one test bottle after 48h to check carbonation level.
+              ⚠️ Always leave 2" headspace in bottles. Open one test bottle after 48h to check carbonation level.
             </div>
           </div>
         ) : (
@@ -213,7 +213,7 @@ function PrimingSugarCalculator() {
 
 
 
-// â”€â”€â”€ Shared components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared components ───────────────────────────────────────────────────────
 
 function ResultCard({ label, value, color, sublabel }: { label: string; value: string; color: string; sublabel?: string }) {
   return (
