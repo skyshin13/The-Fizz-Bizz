@@ -7,9 +7,9 @@
 
 ## 1. Mission
 
-Home fermenters — brewers, kombucha makers, food fermenters, wine makers — track their batches across notebooks, spreadsheets, and memory. There is no single place to log measurements over time, visualize fermentation progress, set automated reminders, or share a batch with the community.
+Home fermenters like brewers, kombucha makers, food fermenters, wine makers, track their batches across notebooks, spreadsheets, and memory. There is no single place to log measurements over time, visualize fermentation progress, set automated reminders, or share a batch with the community.
 
-Fizz Bizz is a full-stack fermentation management platform that solves exactly that. Users create projects for any of 12 fermentation types, log pH, specific gravity, CO₂ pressure, temperature, and ABV over time, view live trend charts, and receive automated SMS/email reminders. A social layer — follows, likes, comments, and a public Explore feed — lets the fermentation community share and discover each other's batches. The platform also runs a continuous physics-based CO₂ simulation for alcohol fermentations so the chart updates even when no manual readings have been logged.
+Fizz Bizz is a full-stack fermentation management platform that solves exactly that. Users create projects for any of 12 fermentation types, log pH, specific gravity, CO₂ pressure, temperature, and ABV over time, view live trend charts, and receive automated SMS/email reminders. A social layer including follows, likes, comments, and a public Explore feed, lets the fermentation community share and discover each other's batches. The platform also runs a continuous physics-based CO₂ simulation for alcohol fermentations so the chart updates even when no manual readings have been logged.
 
 ---
 
@@ -101,7 +101,7 @@ Supabase Storage holds binary photo assets; only the public URL is stored in the
 
 ### Query 1 — Batch yeast-strain loading (N+1 elimination)
 
-When listing a user's projects, each project may reference a yeast strain via `project_yeast_connections`. A naïve implementation would issue one query per project. Instead, `_attach_yeast_strains_batch()` in [`backend/app/api/routes/projects.py`](backend/app/api/routes/projects.py) resolves all strains in exactly two queries regardless of how many projects are returned:
+When listing a user's projects, each project may reference a yeast strain via `project_yeast_connections`. A naïve implementation would issue one query per project (going through each project as one query and running another query to get the yeast). Instead, `_attach_yeast_strains_batch()` in [`backend/app/api/routes/projects.py`](backend/app/api/routes/projects.py) resolves all strains in exactly two queries regardless of how many projects are returned: one to get all the yeast connections, one to get all the yeast profiles.
 
 ```python
 # Query 1: all connections for the project set
@@ -121,7 +121,7 @@ Results are assembled in Python dicts keyed by ID, so each project lookup is O(1
 
 ### Query 2 — Separating simulation data from user data
 
-The `measurement_logs` table stores both user-entered readings and auto-generated CO₂/temperature points from the live simulation. Mixing them on the dashboard would show thousands of machine rows where users expect to see their manual entries. The filter `_USER_MEAS_FILTER` selects only meaningful records:
+The `measurement_logs` table stores both user-entered readings (pH, ABV, etc) and auto-generated CO₂/temperature points from the live simulation (live CO₂ production graph). Mixing them on the dashboard would show thousands of machine rows where users expect to see their manual entries on the fermentation trends section. The filter `_USER_MEAS_FILTER` selects only meaningful records:
 
 ```python
 _USER_MEAS_FILTER = or_(
@@ -174,7 +174,7 @@ projects = db.query(FermentationProject).filter(
 
 ## 5. Complexity Component — Live CO₂ Simulation Engine
 
-The most technically distinctive part of Fizz Bizz is the live fermentation simulation that drives the CO₂ chart for alcohol and kombucha projects without requiring any user action.
+The most technically distinctive part of Fizz Bizz is the live fermentation simulation that drives the CO₂ chart for alcoholic beverages (beer, wine, kombucha, cider) projects without requiring any user action. This components would be useful for homebrewers who do not have access to CO₂ sensors because of expenses, and it a great way for users to be able to have estimated CO₂ limitations to know if their project is overproducing and CO₂ must be released ("burped").
 
 ### The problem
 
@@ -232,7 +232,9 @@ Each project resolves a yeast strain from its `ProjectYeastConnection`. The stra
 
 ### AI-assisted development
 
-Claude Code was used throughout the project for implementation, debugging, and refactoring. The most valuable uses were: tracing subtle bugs across multiple files (e.g. the `_next_trigger` timezone double-conversion), generating the ORM query patterns for the social graph visibility filter, and catching security issues (a hardcoded API key was flagged and removed before a push reached GitHub's secret scanner). The AI was most useful as a fast second reader on complex logic and least useful when the problem required judgment calls about product behavior — those decisions always came back to the developer.
+Claude Code was used throughout the project for implementation, schema design, debugging, and aesthetics. It was most helpful for tracing bugs when managing multiple files (friendship relationships; yeast, recipe, project relationships), generating the ORM query patterns for the social graph visibility filter, and web scraping for the yeast and recipes libraries. 
+
+It had difficulty in judgement call for the complexity component, as it was not able to fully grasp the live simulation behavior and how it was supposed to run. It required specific information on how the graph must behave online and offline, how the graph should look (axis, sectioning custom time intervals), and needed explanations on why the live behavior was incorrect.
 
 ---
 
@@ -245,7 +247,7 @@ The single Railway instance runs the API, the CER simulation loop, and the remin
 ### Evolution path
 
 **Database layer**
-- Move to a connection pool manager (PgBouncer) in front of PostgreSQL immediately — SQLAlchemy's default pool is insufficient under concurrent load.
+- Move to a connection pool manager (PgBouncer) in front of PostgreSQL immediately. SQLAlchemy's default pool is insufficient under concurrent load.
 - Add read replicas. The Explore feed, public project views, and profile pages are all read-heavy and can be served from replicas. Only writes (measurements, notes, likes) need the primary.
 - Partition `measurement_logs` by `project_id` or time range. At 1M users with dozens of active projects each, this table becomes the largest by far. Partitioning keeps index sizes manageable and enables archiving old data to cheaper storage.
 - Add a Redis cache in front of the Explore feed and yeast library. These are shared reads with low write frequency — ideal candidates.
