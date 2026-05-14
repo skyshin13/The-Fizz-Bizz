@@ -14,6 +14,7 @@ from app.services.cer_engine import (
     KOMBUCHA_STRAINS, KOMBUCHA_STRAIN_MAP,
     simulate_cer_kombucha, KombuchaCERState, step_cer_kombucha,
 )
+from app.services.live_cer_task import _create_initial_state
 from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.models.models import User, MeasurementLog, ProjectCERState, FermentationProject
@@ -271,10 +272,11 @@ def update_cer_params(
 
     state_row = db.query(ProjectCERState).filter_by(project_id=project_id).first()
     if not state_row:
-        raise HTTPException(status_code=404, detail="Simulation state not initialised yet")
+        now = datetime.now(timezone.utc)
+        state_row = _create_initial_state(project, db, now)
 
     if body.strain_id is not None:
-        if body.strain_id not in STRAIN_MAP:
+        if body.strain_id not in STRAIN_MAP and body.strain_id not in KOMBUCHA_STRAIN_MAP:
             raise HTTPException(status_code=400, detail=f"Unknown strain: {body.strain_id}")
         state_row.strain_id = body.strain_id
     if body.sugar_g is not None:
