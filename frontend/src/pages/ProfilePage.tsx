@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
@@ -18,7 +18,7 @@ export default function ProfilePage() {
   return isOwnProfile ? <OwnProfile /> : <OtherProfile username={username!} />
 }
 
-// â”€â”€â”€ Own Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Own Profile ─────────────────────────────────────────────────────────────
 
 function OwnProfile() {
   const { user: me, refreshUser } = useAuth()
@@ -133,7 +133,7 @@ function OwnProfile() {
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
         ) : accepted.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--card-bg)', borderRadius: '12px', border: '2px dashed var(--border)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>ðŸ¤</div>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🤝</div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No friends yet. <Link to="/explore" style={{ color: 'var(--amber)' }}>Explore</Link> to find fellow brewers!</p>
           </div>
         ) : (
@@ -154,7 +154,7 @@ function OwnProfile() {
               <h2 style={{ fontSize: '1.1rem' }}>Friends' Recent Activity</h2>
             </div>
             <Link to="/explore" style={{ fontSize: '0.8rem', color: 'var(--amber)', fontWeight: 500, textDecoration: 'none' }}>
-              See all â†’
+              See all →
             </Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
@@ -192,7 +192,7 @@ function OwnProfile() {
   )
 }
 
-// â”€â”€â”€ Other User's Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Other User's Profile ─────────────────────────────────────────────────────
 
 function OtherProfile({ username }: { username: string }) {
   const { user: me } = useAuth()
@@ -267,7 +267,7 @@ function OtherProfile({ username }: { username: string }) {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>@{profile.username}</p>
           {profile.bio && <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{profile.bio}</p>}
           <p style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
-            Brewing since {format(new Date(profile.created_at), 'MMMM yyyy')} Â· {profile.public_project_count} public project{profile.public_project_count !== 1 ? 's' : ''}
+            Brewing since {format(new Date(profile.created_at), 'MMMM yyyy')} · {profile.public_project_count} public project{profile.public_project_count !== 1 ? 's' : ''}
           </p>
         </div>
         <div>{friendBtn()}</div>
@@ -282,7 +282,7 @@ function OtherProfile({ username }: { username: string }) {
 
         {profile.public_projects.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--card-bg)', borderRadius: '12px', border: '2px dashed var(--border)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>ðŸ«™</div>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🫙</div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No public projects yet.</p>
           </div>
         ) : (
@@ -294,7 +294,7 @@ function OtherProfile({ username }: { username: string }) {
         )}
       </div>
 
-      {/* Liked projects â€” visible when friendship accepted and user shares activity */}
+      {/* Liked projects — visible when friendship accepted and user shares activity */}
       {profile.liked_projects && profile.liked_projects.length > 0 && (
         <div className="fade-in-delay-2" style={{ marginTop: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1rem' }}>
@@ -312,7 +312,7 @@ function OtherProfile({ username }: { username: string }) {
   )
 }
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ name, avatarUrl, size = 40 }: { name: string; avatarUrl?: string | null; size?: number }) {
   if (avatarUrl) {
@@ -383,7 +383,7 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
           .from('project-photos')
           .upload(path, avatarFile, { upsert: true })
         if (uploadError) {
-          toast.error('Photo upload failed â€” profile saved without new photo.')
+          toast.error('Photo upload failed — profile saved without new photo.')
         } else {
           const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(path)
           avatar_url = urlData.publicUrl
@@ -527,4 +527,3 @@ function PublicProjectMiniCard({ project, getEmoji }: { project: PublicProject; 
     </Link>
   )
 }
-

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useFermentationTypes } from '../hooks/useLookups'
@@ -50,7 +50,7 @@ export default function ShareProjectPage() {
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--warm-white)' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>ðŸ«§</div>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🫧</div>
         <div className="spinner" style={{ margin: '0 auto' }} />
       </div>
     </div>
@@ -58,7 +58,7 @@ export default function ShareProjectPage() {
 
   if (notFound || !project) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--warm-white)', gap: '1rem' }}>
-      <div style={{ fontSize: '3rem' }}>ðŸ«™</div>
+      <div style={{ fontSize: '3rem' }}>🫙</div>
       <h2 style={{ color: 'var(--text-secondary)' }}>Project not found</h2>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>This project may be private or no longer exists.</p>
       <Link to="/" style={{ padding: '0.625rem 1.25rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontWeight: 600, fontSize: '0.875rem' }}>
@@ -94,7 +94,7 @@ export default function ShareProjectPage() {
       {/* Top bar */}
       <div style={{ background: 'var(--brown-dark)', padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>ðŸ«§</span>
+          <span style={{ fontSize: '1.5rem' }}>🫧</span>
           <div>
             <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1rem', fontWeight: 700, color: 'var(--amber-glow)' }}>Fizz Bizz</div>
             <div style={{ fontSize: '0.6rem', color: 'rgba(245,199,110,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Fermentation Studio</div>
@@ -138,7 +138,7 @@ export default function ShareProjectPage() {
           </div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             Shared by <strong style={{ color: 'var(--text-secondary)' }}>{author}</strong>
-            {project.start_date && <> Â· Started {formatDistanceToNow(new Date(project.start_date), { addSuffix: true })}</>}
+            {project.start_date && <> · Started {formatDistanceToNow(new Date(project.start_date), { addSuffix: true })}</>}
           </p>
         </div>
 
@@ -158,7 +158,7 @@ export default function ShareProjectPage() {
                 { label: 'Gravity (SG)', value: latestM.specific_gravity?.toFixed(3), icon: FlaskConical, color: 'var(--amber)' },
                 { label: 'Est. ABV', value: latestM.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined, icon: Activity, color: 'var(--rust)' },
               ] : []),
-              { label: 'Temp (Â°F)', value: latestM.temperature_celsius != null ? String(toF(latestM.temperature_celsius)) : undefined, icon: Thermometer, color: 'var(--slate)' },
+              { label: 'Temp (°F)', value: latestM.temperature_celsius != null ? String(toF(latestM.temperature_celsius)) : undefined, icon: Thermometer, color: 'var(--slate)' },
             ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
@@ -166,7 +166,7 @@ export default function ShareProjectPage() {
                   <Icon size={13} color={color} />
                 </div>
                 <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.35rem', color: value ? 'var(--brown-dark)' : 'var(--border)' }}>
-                  {value || 'â€”'}
+                  {value || '—'}
                 </div>
               </div>
             ))}
@@ -176,7 +176,7 @@ export default function ShareProjectPage() {
         {/* Chart */}
         {chartData.length >= 2 && (
           <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.25rem 1.5rem', border: '1px solid var(--border-light)', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Fermentation Trend â€” pH</h2>
+            <h2 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Fermentation Trend — pH</h2>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
@@ -198,17 +198,16 @@ export default function ShareProjectPage() {
 
         {/* CTA */}
         <div style={{ background: 'var(--brown-dark)', borderRadius: '14px', padding: '1.75rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>ðŸ«§</div>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🫧</div>
           <h3 style={{ color: 'var(--amber-glow)', fontFamily: 'Playfair Display, serif', marginBottom: '0.5rem' }}>Start tracking your own ferments</h3>
           <p style={{ color: 'rgba(245,240,232,0.6)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-            Log pH, gravity, COâ‚‚, and more. Track kombucha, beer, wine, kimchi & beyond.
+            Log pH, gravity, CO₂, and more. Track kombucha, beer, wine, kimchi & beyond.
           </p>
           <Link to="/register" style={{ display: 'inline-block', padding: '0.7rem 1.75rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '10px', fontWeight: 700, fontSize: '0.9rem' }}>
-            Join Fizz Bizz â€” it's free
+            Join Fizz Bizz — it's free
           </Link>
         </div>
       </div>
     </div>
   )
 }
-

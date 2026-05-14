@@ -1,4 +1,4 @@
-﻿import { useState, FormEvent } from 'react'
+import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -31,7 +31,7 @@ export default function LoginPage() {
       <div className="fade-in" style={{ width: '100%', maxWidth: '400px' }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>ðŸ«§</div>
+          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🫧</div>
           <h1 style={{ fontFamily: 'Playfair Display, serif', color: 'var(--amber-glow)', fontSize: '2rem', marginBottom: '0.25rem' }}>
             Fizz Bizz
           </h1>
@@ -61,11 +61,11 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 style={inputStyle}
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="••••••••"
               />
             </div>
             <button type="submit" disabled={loading} style={btnStyle}>
-              {loading ? <><span className="spinner" style={{ display: 'inline-block', marginRight: 8 }} />Signing in...</> : 'Sign In â†’'}
+              {loading ? <><span className="spinner" style={{ display: 'inline-block', marginRight: 8 }} />Signing in...</> : 'Sign In →'}
             </button>
           </form>
 
@@ -102,4 +102,3 @@ const btnStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
 }
-

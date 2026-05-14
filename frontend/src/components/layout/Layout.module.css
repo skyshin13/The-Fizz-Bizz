@@ -1,4 +1,4 @@
-﻿.root {
+.root {
   display: flex;
   height: 100vh;
   overflow: hidden;
@@ -175,7 +175,7 @@
   background: var(--warm-white);
 }
 
-/* â”€â”€ Bottom nav (base â€” hidden on desktop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Bottom nav (base — hidden on desktop) ────────────── */
 .bottomNav {
   display: none;
   position: fixed;
@@ -239,7 +239,7 @@
   filter: drop-shadow(0 0 4px rgba(245, 199, 110, 0.5));
 }
 
-/* â”€â”€ Mobile (â‰¤ 768px) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Mobile (≤ 768px) ─────────────────────────────────── */
 .iconWrap {
   position: relative;
   display: flex;
@@ -301,4 +301,3 @@
     display: flex;
   }
 }
-

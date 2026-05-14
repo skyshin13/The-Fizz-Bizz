@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { PublicProject, PublicUser, FriendActivityProject, FriendInteraction, ProjectComment } from '../types'
@@ -129,7 +129,7 @@ export default function ExplorePage() {
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading...</div>
           ) : filteredProjects.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--card-bg)', borderRadius: '12px', border: '2px dashed var(--border)' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>ðŸ«™</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🫙</div>
               <p style={{ color: 'var(--text-muted)' }}>No public projects found yet. Be the first to share!</p>
             </div>
           ) : (
@@ -169,7 +169,7 @@ export default function ExplorePage() {
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading...</div>
           ) : friendProjects.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--card-bg)', borderRadius: '12px', border: '2px dashed var(--border)' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>ðŸ¤</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🤝</div>
               <p style={{ color: 'var(--text-muted)' }}>
                 No friend activity yet. Add friends and ask them to enable activity sharing in their profile!
               </p>
@@ -222,7 +222,7 @@ export default function ExplorePage() {
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading...</div>
           ) : users.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--card-bg)', borderRadius: '12px', border: '2px dashed var(--border)' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>ðŸ‘¤</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>👤</div>
               <p style={{ color: 'var(--text-muted)' }}>No users found. Try a different search.</p>
             </div>
           ) : (
@@ -383,16 +383,16 @@ function PublicProjectCard({
         <div style={{ padding: '0.5rem 0.875rem', background: 'var(--amber-glow)', borderBottom: '1px solid var(--amber)', fontSize: '0.72rem', color: 'var(--brown-mid)', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
           {friendInteractions.slice(0, 3).map((ia, i) => (
             <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              {ia.action === 'liked' ? 'â¤ï¸' : 'ðŸ’¬'}
+              {ia.action === 'liked' ? '❤️' : '💬'}
               <strong>@{ia.friend_username}</strong>
               {ia.action === 'liked' ? 'liked' : 'commented'}
-              {i < Math.min(friendInteractions.length, 3) - 1 && <span style={{ color: 'var(--text-muted)', marginLeft: '0.1rem' }}>Â·</span>}
+              {i < Math.min(friendInteractions.length, 3) - 1 && <span style={{ color: 'var(--text-muted)', marginLeft: '0.1rem' }}>·</span>}
             </span>
           ))}
         </div>
       )}
 
-      {/* Clickable header â€” navigates to project */}
+      {/* Clickable header — navigates to project */}
       <Link to={`/projects/${project.id}/view`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
         {project.cover_photo_url ? (
           <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }} />
@@ -420,9 +420,9 @@ function PublicProjectCard({
         </div>
       </Link>
 
-      {/* Interaction area â€” does not navigate */}
+      {/* Interaction area — does not navigate */}
       <div style={{ padding: '0 1rem 1rem' }}>
-        {/* Author row â€” sits directly above the like/comment bar */}
+        {/* Author row — sits directly above the like/comment bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', paddingBottom: '0.75rem' }}>
           <span>by <strong style={{ color: 'var(--text-secondary)' }}>@{project.author_username}</strong></span>
           <span>{formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}</span>
@@ -465,7 +465,7 @@ function PublicProjectCard({
             ) : (
               <div style={{ maxHeight: '240px', overflowY: 'auto', marginBottom: '0.625rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {comments.length === 0 && (
-                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem' }}>No comments yet â€” be the first!</div>
+                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem' }}>No comments yet — be the first!</div>
                 )}
                 {comments.map(c => (
                   <div key={c.id}>
@@ -501,7 +501,7 @@ function PublicProjectCard({
                           style={{ flex: 1, padding: '0.35rem 0.5rem', border: '1px solid var(--amber)', borderRadius: '6px', background: 'var(--warm-white)', fontSize: '0.755rem', fontFamily: 'DM Sans, sans-serif', outline: 'none' }}
                         />
                         <button type="submit" disabled={submittingReply || !(replyTexts[c.id] ?? '').trim()} style={{ padding: '0.35rem 0.6rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '6px', fontSize: '0.73rem', fontWeight: 600, opacity: (submittingReply || !(replyTexts[c.id] ?? '').trim()) ? 0.6 : 1 }}>
-                          {submittingReply ? 'â€¦' : 'Reply'}
+                          {submittingReply ? '…' : 'Reply'}
                         </button>
                       </form>
                     )}
@@ -521,7 +521,7 @@ function PublicProjectCard({
                 disabled={submitting || !commentText.trim()}
                 style={{ padding: '0.4rem 0.75rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontSize: '0.775rem', fontWeight: 600, opacity: (submitting || !commentText.trim()) ? 0.6 : 1 }}
               >
-                {submitting ? 'â€¦' : 'Post'}
+                {submitting ? '…' : 'Post'}
               </button>
             </form>
           </div>
@@ -530,4 +530,3 @@ function PublicProjectCard({
     </div>
   )
 }
-

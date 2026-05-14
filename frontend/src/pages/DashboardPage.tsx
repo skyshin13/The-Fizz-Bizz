@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
@@ -33,7 +33,7 @@ export default function DashboardPage() {
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
         <h1 className={styles.heading}>
-          Good {getTimeOfDay()}, {user?.display_name || user?.username} ðŸ‘‹
+          Good {getTimeOfDay()}, {user?.display_name || user?.username} 👋
         </h1>
         <p style={{ color: 'var(--text-secondary)' }}>Here's what's bubbling in your fermentation studio.</p>
       </div>
@@ -56,7 +56,7 @@ export default function DashboardPage() {
                 <Icon size={16} color={color} />
               </div>
             </div>
-            <div style={{ fontSize: '2rem', fontFamily: 'Playfair Display, serif', fontWeight: 600, color: 'var(--brown-dark)' }}>{loading ? 'â€”' : value}</div>
+            <div style={{ fontSize: '2rem', fontFamily: 'Playfair Display, serif', fontWeight: 600, color: 'var(--brown-dark)' }}>{loading ? '—' : value}</div>
           </div>
         ))}
       </div>
@@ -156,7 +156,7 @@ function Metric({ label, value, unit }: { label: string; value?: string; unit: s
     <div style={{ textAlign: 'center' }}>
       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{label}</div>
       <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.1rem', color: value ? 'var(--brown-dark)' : 'var(--border)' }}>
-        {value ? `${value}${unit}` : 'â€”'}
+        {value ? `${value}${unit}` : '—'}
       </div>
     </div>
   )
@@ -165,7 +165,7 @@ function Metric({ label, value, unit }: { label: string; value?: string; unit: s
 function EmptyState() {
   return (
     <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--card-bg)', borderRadius: '12px', border: '2px dashed var(--border)' }}>
-      <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>ðŸ«™</div>
+      <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🫙</div>
       <h3 style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>No active ferments</h3>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>Start a new batch and track it from day one.</p>
       <Link to="/projects" style={{ padding: '0.625rem 1.25rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontWeight: 600, fontSize: '0.875rem' }}>
@@ -181,4 +181,3 @@ function getTimeOfDay() {
   if (h < 17) return 'afternoon'
   return 'evening'
 }
-
