@@ -400,7 +400,8 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
       })
       toast.success('Profile updated!')
       onSaved()
-    } catch {
+    } catch (err) {
+      console.error('Profile update failed:', err)
       toast.error('Failed to update profile')
     } finally {
       setSaving(false)

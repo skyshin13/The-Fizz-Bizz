@@ -91,7 +91,7 @@ class UserBase(BaseModel):
 class UserOut(UserBase):
     id: int
     avatar_url: Optional[str] = None
-    sms_notifications_enabled: bool
+    sms_notifications_enabled: bool = False
     email_notifications_enabled: bool = False
     show_activity_to_friends: bool = False
     created_at: datetime

@@ -6,6 +6,10 @@ A full-stack fermentation management platform for homebrewers, kombucha makers, 
 
 **https://the-fizz-bizz.vercel.app/**
 
+## 🎬 Demo Video
+
+**https://github.com/skyshin13/The-Fizz-Bizz**
+
 ---
 
 ## Tech Stack
