@@ -27,6 +27,7 @@ def _run_migrations():
             "ALTER TABLE fermentation_projects ADD COLUMN visibility TEXT DEFAULT 'private'",
             "ALTER TABLE users ADD COLUMN show_activity_to_friends BOOLEAN DEFAULT FALSE",
             "ALTER TABLE project_comments ADD COLUMN parent_id INTEGER REFERENCES project_comments(id)",
+            "ALTER TABLE recipe_ingredients ADD COLUMN yeast_profile_id INTEGER REFERENCES yeast_profiles(id)",
             # Indexes — fermentation_projects
             "CREATE INDEX IF NOT EXISTS ix_fp_user_id ON fermentation_projects (user_id)",
             "CREATE INDEX IF NOT EXISTS ix_fp_is_public ON fermentation_projects (is_public)",
@@ -78,10 +79,12 @@ async def lifespan(app: FastAPI):
         logger.error(f"Startup DB error: {e}")
     try:
         db = SessionLocal()
-        matched = sync_all_yeast_links(db)
-        if matched:
-            logger.info(f"Startup yeast link sync: linked {matched} ingredient(s) to yeast profiles")
-        db.close()
+        try:
+            matched = sync_all_yeast_links(db)
+            if matched:
+                logger.info(f"Startup yeast link sync: linked {matched} ingredient(s) to yeast profiles")
+        finally:
+            db.close()
     except Exception as e:
         logger.error(f"Startup yeast link sync error: {e}")
 
