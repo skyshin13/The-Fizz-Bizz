@@ -363,6 +363,32 @@ def add_observation(
     return obs
 
 
+@router.patch("/{project_id}/observations/{obs_id}", response_model=ObservationOut)
+def update_observation(
+    project_id: int,
+    obs_id: int,
+    body: ObservationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.query(FermentationProject).filter(
+        FermentationProject.id == project_id, FermentationProject.user_id == current_user.id
+    ).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+    obs = db.query(ObservationNote).filter(
+        ObservationNote.id == obs_id, ObservationNote.project_id == project_id
+    ).first()
+    if not obs:
+        raise HTTPException(404, "Observation not found")
+    updates = body.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(obs, field, value)
+    db.commit()
+    db.refresh(obs)
+    return obs
+
+
 @router.get("/{project_id}/public", response_model=PublicProjectDetailOut)
 def get_public_project(
     project_id: int,

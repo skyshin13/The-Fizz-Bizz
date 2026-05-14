@@ -137,6 +137,7 @@ class ObservationCreate(BaseModel):
     content: str = ""
     tags: Optional[List[str]] = None
     photo_url: Optional[str] = None
+    created_at: Optional[datetime] = None
 
 
 class ObservationOut(ObservationCreate):

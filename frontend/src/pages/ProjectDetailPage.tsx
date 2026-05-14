@@ -602,22 +602,9 @@ export default function ProjectDetailPage() {
               {project.observations.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No notes yet.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', maxHeight: '320px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.75rem' }}>
                   {project.observations.slice().reverse().map(obs => (
-                    <div key={obs.id} style={{ paddingBottom: '0.875rem', borderBottom: '1px solid var(--border-light)' }}>
-                      {obs.photo_url && (
-                        <img src={obs.photo_url} alt="" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px', marginBottom: '0.5rem' }} />
-                      )}
-                      <p style={{ fontSize: '0.875rem', marginBottom: '0.375rem' }}>{obs.content}</p>
-                      <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {obs.tags?.map(tag => (
-                          <span key={tag} style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: 'var(--parchment)', borderRadius: '20px', color: 'var(--text-muted)' }}>{tag}</span>
-                        ))}
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                          {format(parseISO(obs.created_at), 'MMM d, yyyy')}
-                        </span>
-                      </div>
-                    </div>
+                    <ObservationRow key={obs.id} obs={obs} projectId={projectId!} onSaved={loadProject} />
                   ))}
                 </div>
               )}
@@ -904,6 +891,87 @@ function NoteModal({ projectId, onClose, onAdded }: { projectId: number; onClose
         <ModalFooter onClose={onClose} loading={loading} submitLabel="Add Note" />
       </form>
     </Modal>
+  )
+}
+
+function ObservationRow({ obs, projectId, onSaved }: { obs: { id: number; content: string; tags?: string[]; photo_url?: string | null; created_at: string }; projectId: string; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [content, setContent] = useState(obs.content)
+  const [dateVal, setDateVal] = useState(obs.created_at.slice(0, 10))
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.patch(`/projects/${projectId}/observations/${obs.id}`, {
+        content,
+        tags: obs.tags ?? [],
+        photo_url: obs.photo_url ?? null,
+        created_at: new Date(dateVal + 'T12:00:00').toISOString(),
+      })
+      toast.success('Note updated')
+      setEditing(false)
+      onSaved()
+    } catch {
+      toast.error('Failed to update note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const cancel = () => {
+    setContent(obs.content)
+    setDateVal(obs.created_at.slice(0, 10))
+    setEditing(false)
+  }
+
+  return (
+    <div style={{ paddingBottom: '0.875rem', borderBottom: '1px solid var(--border-light)' }}>
+      {obs.photo_url && (
+        <img src={obs.photo_url} alt="" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px', marginBottom: '0.5rem' }} />
+      )}
+      {editing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem 0.625rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--warm-white)', fontSize: '0.875rem', resize: 'vertical', minHeight: '64px', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Date</label>
+            <input
+              type="date"
+              value={dateVal}
+              onChange={e => setDateVal(e.target.value)}
+              style={{ flex: 1, padding: '0.35rem 0.5rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--warm-white)', fontSize: '0.8rem', color: 'var(--text-primary)' }}
+            />
+            <button onClick={save} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.35rem 0.75rem', background: 'var(--moss)', color: '#fff', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, border: 'none', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+              <Check size={13} /> Save
+            </button>
+            <button onClick={cancel} style={{ padding: '0.35rem 0.625rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+            <p style={{ fontSize: '0.875rem', marginBottom: '0.375rem', flex: 1 }}>{obs.content}</p>
+            <button onClick={() => setEditing(true)} style={{ flexShrink: 0, padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: '4px' }} title="Edit note">
+              <Pencil size={13} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {obs.tags?.map(tag => (
+              <span key={tag} style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', background: 'var(--parchment)', borderRadius: '20px', color: 'var(--text-muted)' }}>{tag}</span>
+            ))}
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto', paddingRight: '0.25rem' }}>
+              {format(parseISO(obs.created_at), 'MMM d, yyyy')}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
