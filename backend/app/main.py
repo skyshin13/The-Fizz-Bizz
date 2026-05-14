@@ -9,6 +9,8 @@ from app.db.database import Base, engine
 from app.api.routes import auth, users, projects, yeasts, recipes, calculations, lookup, explore, friends, reminders
 from app.services.live_cer_task import live_cer_loop
 from app.services.reminder_task import reminder_loop
+from app.services.yeast_matcher import sync_all_yeast_links
+from app.db.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +76,15 @@ async def lifespan(app: FastAPI):
         _run_migrations()
     except Exception as e:
         logger.error(f"Startup DB error: {e}")
+    try:
+        db = SessionLocal()
+        matched = sync_all_yeast_links(db)
+        if matched:
+            logger.info(f"Startup yeast link sync: linked {matched} ingredient(s) to yeast profiles")
+        db.close()
+    except Exception as e:
+        logger.error(f"Startup yeast link sync error: {e}")
+
     task = asyncio.create_task(live_cer_loop())
     rtask = asyncio.create_task(reminder_loop())
     yield

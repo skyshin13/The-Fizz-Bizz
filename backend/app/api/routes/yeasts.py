@@ -76,16 +76,26 @@ def get_yeast(
     connections = (
         db.query(ProjectYeastConnection)
         .join(FermentationProject)
+        .options(joinedload(ProjectYeastConnection.project))
         .filter(
             ProjectYeastConnection.yeast_id == yeast_id,
             FermentationProject.user_id == current_user.id,
         )
         .all()
     )
-    project_names = [c.project.name for c in connections if c.project]
+
+    linked_rows = (
+        db.query(RecipeIngredient.yeast_profile_id, Recipe.id, Recipe.name)
+        .join(Recipe, Recipe.id == RecipeIngredient.recipe_id)
+        .filter(RecipeIngredient.yeast_profile_id == yeast_id)
+        .distinct()
+        .all()
+    )
+
     yeast_out = YeastProfileOut.model_validate(y)
     yeast_out.times_used = len(connections)
-    yeast_out.user_projects = project_names
+    yeast_out.user_projects = [UserProjectRef(id=c.project.id, name=c.project.name) for c in connections if c.project]
+    yeast_out.linked_recipes = [RecipeRef(id=row.id, name=row.name) for row in linked_rows]
     return yeast_out
 
 
