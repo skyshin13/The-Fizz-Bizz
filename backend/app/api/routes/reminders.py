@@ -133,6 +133,19 @@ def create_reminder(
     return reminder
 
 
+def _friendly_interval(hours: int) -> str:
+    if hours < 24:
+        return f"every {hours} hour{'s' if hours != 1 else ''}"
+    if hours < 168:
+        days = hours // 24
+        return f"every {days} day{'s' if days != 1 else ''}"
+    if hours < 720:
+        weeks = hours // 168
+        return f"every {weeks} week{'s' if weeks != 1 else ''}"
+    months = hours // 720
+    return f"every {months} month{'s' if months != 1 else ''}"
+
+
 @router.patch("/reminders/{reminder_id}", response_model=ReminderOut)
 def update_reminder(
     reminder_id: int,
@@ -146,18 +159,53 @@ def update_reminder(
     ).first()
     if not reminder:
         raise HTTPException(404, "Reminder not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+
+    updated_fields = body.model_dump(exclude_unset=True)
+    for field, value in updated_fields.items():
         setattr(reminder, field, value)
+
     # Recalculate next trigger if interval or preferred time changed
-    if reminder.reminder_type != 'co2_limit' and any(
-        f in body.model_dump(exclude_unset=True) for f in ('interval_hours', 'preferred_hour', 'preferred_minute')
-    ):
+    timing_changed = any(f in updated_fields for f in ('interval_hours', 'preferred_hour', 'preferred_minute'))
+    if reminder.reminder_type != 'co2_limit' and timing_changed:
         now = datetime.now(timezone.utc)
         reminder.next_trigger_at = _calc_next_trigger(
             now, reminder.interval_hours, reminder.preferred_hour, reminder.preferred_minute
         )
+
     db.commit()
     db.refresh(reminder)
+
+    # ── Update confirmation notification ──────────────────────────────────────
+    meaningful = {k for k in updated_fields if k not in ('is_active',)}
+    if meaningful and reminder.reminder_type != 'co2_limit':
+        project = db.query(FermentationProject).filter_by(id=reminder.project_id).first()
+        project_name = project.name if project else f"project #{reminder.project_id}"
+
+        lines = [f'✏️ Reminder updated for "{project_name}"']
+        if 'interval_hours' in updated_fields:
+            lines.append(f'  • Frequency: {_friendly_interval(reminder.interval_hours)}')
+        if 'preferred_hour' in updated_fields or 'preferred_minute' in updated_fields:
+            if reminder.preferred_hour is not None:
+                h, m = reminder.preferred_hour, reminder.preferred_minute or 0
+                lines.append(f'  • Time: {h:02d}:{m:02d} UTC')
+            else:
+                lines.append('  • Time: no preferred time set')
+        if 'message' in updated_fields:
+            lines.append(f'  • Message: "{reminder.message}"')
+        if reminder.next_trigger_at:
+            lines.append(f'  • Next reminder: {reminder.next_trigger_at.strftime("%A, %b %-d at %-I:%M %p UTC")}')
+
+        notify_msg = '\n'.join(lines)
+        if reminder.email_enabled and current_user.email:
+            send_email(
+                current_user.email,
+                f'Fizz Bizz — Reminder Updated: {project_name}',
+                notify_msg,
+            )
+        phone = reminder.phone_number or current_user.phone_number
+        if reminder.sms_enabled and phone:
+            send_sms(phone, notify_msg)
+
     return reminder
 
 
