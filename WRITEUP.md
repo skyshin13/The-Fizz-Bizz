@@ -7,7 +7,7 @@
 
 ## 1. Mission
 
-Home fermenters like brewers, kombucha makers, food fermenters, wine makers, track their batches across notebooks, spreadsheets, and memory. There is no single place to log measurements over time, visualize fermentation progress, set automated reminders, or share a batch with the community.
+For home fermenters like brewers, kombucha makers, food fermenters, wine makers, that go the traditional route and track projects across notebooks, spreadsheets, and memory. For them, there is no single place to log measurements over time, visualize fermentation progress, set automated reminders, or share a batch with the community.
 
 Fizz Bizz is a full-stack fermentation management platform that solves exactly that. Users create projects for any of 12 fermentation types, log pH, specific gravity, CO₂ pressure, temperature, and ABV over time, view live trend charts, and receive automated SMS/email reminders. A social layer including follows, likes, comments, and a public Explore feed, lets the fermentation community share and discover each other's batches. The platform also runs a continuous physics-based CO₂ simulation for alcohol fermentations so the chart updates even when no manual readings have been logged.
 
@@ -250,10 +250,10 @@ The single Railway instance runs the API, the CER simulation loop, and the remin
 - Move to a connection pool manager (PgBouncer) in front of PostgreSQL immediately. SQLAlchemy's default pool is insufficient under concurrent load.
 - Add read replicas. The Explore feed, public project views, and profile pages are all read-heavy and can be served from replicas. Only writes (measurements, notes, likes) need the primary.
 - Partition `measurement_logs` by `project_id` or time range. At 1M users with dozens of active projects each, this table becomes the largest by far. Partitioning keeps index sizes manageable and enables archiving old data to cheaper storage.
-- Add a Redis cache in front of the Explore feed and yeast library. These are shared reads with low write frequency — ideal candidates.
+- Add a Redis cache in front of the Explore feed and yeast library. These are shared reads with low write frequency.
 
 **Application layer**
-- Separate the CER simulation and reminder background tasks into dedicated worker processes (Celery workers backed by Redis or RabbitMQ). This removes them from the API process and makes both independently scalable.
+- Separate the CER simulation and reminder background tasks into dedicated worker processes (Celery workers backed by Redis). This removes them from the API process and makes both independently scalable.
 - Horizontally scale the FastAPI API behind a load balancer. The API is already stateless (JWT auth, no in-process session state) so this requires no code changes.
 - Move reminder scheduling to a proper task queue with at-least-once delivery guarantees (e.g. Celery + Redis Streams). The current asyncio loop can miss a window if the process restarts mid-minute.
 
