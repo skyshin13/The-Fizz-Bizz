@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+﻿import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useFermentationTypes } from '../hooks/useLookups'
@@ -229,7 +229,7 @@ export default function PublicProjectViewPage() {
               )}
               {project.end_date && (
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  · Finished {format(parseISO(project.end_date), 'MMM d, yyyy')}
+                  Â· Finished {format(parseISO(project.end_date), 'MMM d, yyyy')}
                 </span>
               )}
             </div>
@@ -244,7 +244,7 @@ export default function PublicProjectViewPage() {
           {project.author_avatar_url ? (
             <img src={project.author_avatar_url} alt={author} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
           ) : (
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '0.85rem', color: 'var(--brown-dark)', flexShrink: 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Playfair Display, serif', fontWeight: 700, fontSize: '0.85rem', color: 'var(--brown-dark)', flexShrink: 0 }}>
               {author[0]?.toUpperCase()}
             </div>
           )}
@@ -300,7 +300,7 @@ export default function PublicProjectViewPage() {
             {project.initial_gravity && <Detail icon={<Activity size={13} />} label="OG">{project.initial_gravity.toFixed(3)}</Detail>}
             {project.initial_ph && <Detail icon={<Droplets size={13} />} label="Starting pH">{project.initial_ph.toFixed(1)}</Detail>}
             {project.fermentation_temp_celsius && (
-              <Detail icon={<Thermometer size={13} />} label="Temp">{toF(project.fermentation_temp_celsius)}°F</Detail>
+              <Detail icon={<Thermometer size={13} />} label="Temp">{toF(project.fermentation_temp_celsius)}Â°F</Detail>
             )}
           </div>
           {project.yeast_strain && (
@@ -334,7 +334,7 @@ export default function PublicProjectViewPage() {
       {latestM && (
         <div className="fade-in-delay-1" style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Latest Readings <span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>· {formatDistanceToNow(new Date(latestM.logged_at), { addSuffix: true })}</span>
+            Latest Readings <span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>Â· {formatDistanceToNow(new Date(latestM.logged_at), { addSuffix: true })}</span>
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.75rem' }}>
             {[
@@ -343,15 +343,15 @@ export default function PublicProjectViewPage() {
                 { label: 'Gravity', value: latestM.specific_gravity?.toFixed(3), icon: FlaskConical, color: 'var(--amber)' },
                 { label: 'Est. ABV', value: latestM.alcohol_by_volume ? `${latestM.alcohol_by_volume.toFixed(1)}%` : undefined, icon: Activity, color: 'var(--rust)' },
               ] : []),
-              { label: 'CO₂ (psi)', value: latestM.co2_psi?.toFixed(1), icon: Wind, color: 'var(--slate)' },
-              { label: 'Temp', value: latestM.temperature_celsius != null ? `${toF(latestM.temperature_celsius)}°F` : undefined, icon: Thermometer, color: 'var(--slate)' },
+              { label: 'COâ‚‚ (psi)', value: latestM.co2_psi?.toFixed(1), icon: Wind, color: 'var(--slate)' },
+              { label: 'Temp', value: latestM.temperature_celsius != null ? `${toF(latestM.temperature_celsius)}Â°F` : undefined, icon: Thermometer, color: 'var(--slate)' },
             ].filter(s => s.value).map(({ label, value, icon: Icon, color }) => (
               <div key={label} style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '0.875rem 1rem', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
                   <Icon size={13} color={color} />
                 </div>
-                <div style={{ fontFamily: 'Fraunces, serif', fontSize: '1.3rem', color: 'var(--brown-dark)' }}>{value}</div>
+                <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.3rem', color: 'var(--brown-dark)' }}>{value}</div>
               </div>
             ))}
           </div>
@@ -523,7 +523,7 @@ function CommentItem({
   return (
     <div style={{ marginLeft: isReply ? '2.25rem' : 0 }}>
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-        <div style={{ width: isReply ? 26 : 30, height: isReply ? 26 : 30, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: '0.75rem', color: 'var(--brown-dark)', flexShrink: 0, overflow: 'hidden' }}>
+        <div style={{ width: isReply ? 26 : 30, height: isReply ? 26 : 30, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Playfair Display, serif', fontWeight: 700, fontSize: '0.75rem', color: 'var(--brown-dark)', flexShrink: 0, overflow: 'hidden' }}>
           {c.author_avatar_url ? (
             <img src={c.author_avatar_url} alt={cAuthor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : cAuthor[0]?.toUpperCase()}
@@ -605,3 +605,4 @@ function CommentItem({
     </div>
   )
 }
+

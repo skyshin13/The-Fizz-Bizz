@@ -1,4 +1,4 @@
-.root {
+﻿.root {
   display: flex;
   height: 100vh;
   overflow: hidden;
@@ -45,7 +45,7 @@
 .logoIcon { font-size: 2rem; }
 
 .logoText {
-  font-family: 'Fraunces', serif;
+  font-family: 'Playfair Display', serif;
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--amber-glow);
@@ -175,7 +175,7 @@
   background: var(--warm-white);
 }
 
-/* ── Bottom nav (base — hidden on desktop) ────────────── */
+/* â”€â”€ Bottom nav (base â€” hidden on desktop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .bottomNav {
   display: none;
   position: fixed;
@@ -239,7 +239,7 @@
   filter: drop-shadow(0 0 4px rgba(245, 199, 110, 0.5));
 }
 
-/* ── Mobile (≤ 768px) ─────────────────────────────────── */
+/* â”€â”€ Mobile (â‰¤ 768px) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .iconWrap {
   position: relative;
   display: flex;
@@ -301,3 +301,4 @@
     display: flex;
   }
 }
+

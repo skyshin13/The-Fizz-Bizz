@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react'
+﻿import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -17,7 +17,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await register(form.email, form.username, form.password, form.displayName)
-      toast.success('Welcome to Fizz Bizz! 🫧')
+      toast.success('Welcome to Fizz Bizz! ðŸ«§')
       navigate('/')
     } catch (err: any) {
       toast.error(err?.message || err?.response?.data?.detail || 'Registration failed')
@@ -32,8 +32,8 @@ export default function RegisterPage() {
 
       <div className="fade-in" style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🫧</div>
-          <h1 style={{ fontFamily: 'Fraunces, serif', color: 'var(--amber-glow)', fontSize: '1.75rem' }}>Create Account</h1>
+          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>ðŸ«§</div>
+          <h1 style={{ fontFamily: 'Playfair Display, serif', color: 'var(--amber-glow)', fontSize: '1.75rem' }}>Create Account</h1>
         </div>
 
         <div style={{ background: 'var(--card-bg)', borderRadius: '16px', padding: '2rem', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
@@ -60,7 +60,7 @@ export default function RegisterPage() {
             ))}
 
             <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', background: 'var(--amber)', color: 'var(--brown-dark)', borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem' }}>
-              {loading ? 'Creating account...' : 'Start Fermenting →'}
+              {loading ? 'Creating account...' : 'Start Fermenting â†’'}
             </button>
           </form>
 
@@ -72,3 +72,4 @@ export default function RegisterPage() {
     </div>
   )
 }
+

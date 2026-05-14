@@ -452,7 +452,7 @@ export default function ProjectDetailPage() {
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
               <Icon size={14} color={color} />
             </div>
-            <div style={{ fontFamily: 'Fraunces, serif', fontSize: '1.5rem', color: value ? 'var(--brown-dark)' : 'var(--border)' }}>
+            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.5rem', color: value ? 'var(--brown-dark)' : 'var(--border)' }}>
               {value || '—'}
             </div>
           </div>
@@ -1109,7 +1109,7 @@ function CompleteProjectModal({ project, isAlcohol, onClose, onCompleted }: {
             {previewAbv && (
               <div style={{ background: 'var(--parchment)', borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Calculated Final ABV</p>
-                <p style={{ fontFamily: 'Fraunces, serif', fontSize: '2rem', color: 'var(--amber)' }}>{previewAbv}%</p>
+                <p style={{ fontFamily: 'Playfair Display, serif', fontSize: '2rem', color: 'var(--amber)' }}>{previewAbv}%</p>
                 {project.initial_gravity && (
                   <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                     OG {project.initial_gravity.toFixed(3)} → FG {fg.toFixed(3)}
@@ -1682,7 +1682,7 @@ function CERTab({ projectId, startDate, initialGravity, batchSizeLiters, ferment
             ].map(({ label, value, unit }) => (
               <div key={label} style={{ padding: '0.75rem', background: 'var(--warm-white)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                 <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
-                <div style={{ fontSize: '1.2rem', fontFamily: 'Fraunces, serif', color: 'var(--amber)', fontWeight: 600 }}>{value}</div>
+                <div style={{ fontSize: '1.2rem', fontFamily: 'Playfair Display, serif', color: 'var(--amber)', fontWeight: 600 }}>{value}</div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{unit}</div>
               </div>
             ))}
@@ -2104,3 +2104,4 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
 }
 const iStyle: React.CSSProperties = { width: '100%', padding: '0.6rem 0.875rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.875rem', color: 'var(--text-primary)' }
 const lStyle: React.CSSProperties = { display: 'block', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.375rem' }
+
