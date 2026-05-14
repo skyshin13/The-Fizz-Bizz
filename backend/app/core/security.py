@@ -66,6 +66,6 @@ def decode_supabase_token(token: str) -> Optional[dict]:
             algorithms=["ES256", "RS256", "HS256"],
             audience="authenticated",
         )
-    except JWTError as e:
+    except Exception as e:
         print(f"[JWT ERROR] {e}")
         return None
