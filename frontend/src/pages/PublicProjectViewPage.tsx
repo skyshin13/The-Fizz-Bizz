@@ -22,6 +22,7 @@ interface SharedMeasurement {
 
 interface SharedObservation {
   content: string
+  photo_url: string | null
   created_at: string
 }
 
@@ -175,6 +176,16 @@ export default function PublicProjectViewPage() {
   if (!project) return null
 
   const isAlcohol = ALCOHOL_TYPES.has(project.fermentation_type)
+
+  // Merge album photos + observation photos into one list for the grid
+  const allPhotos: { url: string; caption: string | null }[] = [
+    ...project.photos.map(p => ({ url: p.url, caption: p.caption })),
+    ...project.observations
+      .filter(o => o.photo_url)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .map(o => ({ url: o.photo_url!, caption: o.content || null })),
+  ]
+
   const sortedMeasurements = [...project.measurements].sort(
     (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
   )
@@ -384,15 +395,15 @@ export default function PublicProjectViewPage() {
       )}
 
       {/* Album photos */}
-      {project.photos.length > 0 && (
+      {allPhotos.length > 0 && (
         <div className="fade-in-delay-2" style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Photos ({project.photos.length})
+            Photos ({allPhotos.length})
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.625rem' }}>
-            {project.photos.map((p) => (
+            {allPhotos.map((p, i) => (
               <div
-                key={p.id}
+                key={i}
                 onClick={() => setLightbox(p.url)}
                 style={{ borderRadius: '10px', overflow: 'hidden', aspectRatio: '1', cursor: 'zoom-in', background: 'var(--parchment)', position: 'relative' }}
               >

@@ -464,7 +464,7 @@ def get_public_project(
         author_avatar_url=project.owner.avatar_url,
         measurements=[SharedMeasurementOut.model_validate(m) for m in user_measurements],
         observations=[
-            SharedObservationOut(content=o.content, created_at=o.created_at)
+            SharedObservationOut(content=o.content, photo_url=o.photo_url, created_at=o.created_at)
             for o in sorted(project.observations, key=lambda o: o.created_at)
         ],
         photos=[PhotoOut.model_validate(p) for p in album_photos],

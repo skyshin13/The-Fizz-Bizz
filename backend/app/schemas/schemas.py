@@ -577,6 +577,7 @@ class SharedMeasurementOut(BaseModel):
 
 class SharedObservationOut(BaseModel):
     content: str
+    photo_url: Optional[str] = None
     created_at: datetime
 
     class Config:
