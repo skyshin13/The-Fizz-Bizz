@@ -86,15 +86,21 @@ export default function DashboardPage() {
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1.25rem' }}>Recently Completed</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {completed.slice(0, 3).map(project => (
-              <Link key={project.id} to={`/projects/${project.id}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1rem', background: 'var(--card-bg)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <span style={{ fontSize: '1.5rem' }}>{getEmoji(project.fermentation_type)}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{project.name}</div>
+              <Link key={project.id} to={`/projects/${project.id}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1rem', background: 'var(--card-bg)', borderRadius: '10px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+                {project.cover_photo_url ? (
+                  <div style={{ width: 44, height: 44, borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
+                    <img src={project.cover_photo_url} alt={project.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>{getEmoji(project.fermentation_type)}</span>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 500, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     {project.end_date ? `Finished ${formatDistanceToNow(new Date(project.end_date), { addSuffix: true })}` : 'Completed'}
                   </div>
                 </div>
-                <span style={{ fontSize: '0.7rem', padding: '0.25rem 0.625rem', background: '#3d4e5c18', color: 'var(--slate)', borderRadius: '20px' }}>Completed</span>
+                <span style={{ fontSize: '0.7rem', padding: '0.25rem 0.625rem', background: '#3d4e5c18', color: 'var(--slate)', borderRadius: '20px', flexShrink: 0 }}>Completed</span>
               </Link>
             ))}
           </div>
