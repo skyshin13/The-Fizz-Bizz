@@ -37,17 +37,18 @@ def _calc_next_trigger(
     preferred_hour: Optional[int],
     preferred_minute: Optional[int],
 ) -> datetime:
-    """Return the next trigger datetime respecting preferred time-of-day if set."""
+    """Return the next trigger datetime respecting preferred time-of-day if set.
+
+    When preferred_hour is given the first trigger is the very next occurrence of
+    that time (could be minutes away), so users can test immediately.  Subsequent
+    triggers advance by interval_hours (handled by _next_trigger in reminder_task).
+    """
     if preferred_hour is None:
         return now + timedelta(hours=interval_hours)
 
     minute = preferred_minute or 0
-    # Find the next occurrence of preferred_hour:minute that is at least interval_hours away
-    candidate = (now + timedelta(hours=interval_hours)).replace(
-        hour=preferred_hour, minute=minute, second=0, microsecond=0
-    )
-    # If snapping to preferred time pushed us earlier than interval_hours from now, add one day
-    if candidate < now + timedelta(hours=interval_hours) - timedelta(hours=1):
+    candidate = now.replace(hour=preferred_hour, minute=minute, second=0, microsecond=0)
+    if candidate <= now:
         candidate += timedelta(days=1)
     return candidate
 

@@ -1814,7 +1814,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
       const interval_hours = isCO2(form.reminder_type)
         ? Math.max(1, parseInt(form.psi_threshold) || 10)
         : Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]
-      const supportsTime = form.reminder_type === 'ph_check' || form.reminder_type === 'gravity_check'
+      const supportsTime = !isCO2(form.reminder_type)
       let preferred_hour: number | null = null
       let preferred_minute: number | null = null
       if (supportsTime && form.preferred_time) {
@@ -1931,9 +1931,9 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
           </div>
         )}
 
-        {(form.reminder_type === 'ph_check' || form.reminder_type === 'gravity_check') && (
+        {!isCO2(form.reminder_type) && (
           <div style={{ marginBottom: '1rem' }}>
-            <label style={lStyle}>Preferred Time of Day <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <label style={lStyle}>First reminder at <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
             <input
               type="time"
               value={form.preferred_time}
@@ -1941,7 +1941,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
               style={{ ...iStyle, width: 'auto' }}
             />
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-              If set, reminders will fire around this time each day (your local time).
+              Fires at this time today (or tomorrow if it's already passed), then repeats every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''}.
             </p>
           </div>
         )}
