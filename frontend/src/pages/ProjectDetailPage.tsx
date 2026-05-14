@@ -30,6 +30,8 @@ export default function ProjectDetailPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const [editingStartDate, setEditingStartDate] = useState(false)
+  const [startDateInput, setStartDateInput] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
   const [descInput, setDescInput] = useState('')
   const [yeastSearch, setYeastSearch] = useState('')
@@ -206,10 +208,47 @@ export default function ProjectDetailPage() {
                 <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.625rem', background: '#4a674118', color: 'var(--moss)', borderRadius: '20px' }}>{project.status}</span>
                 {daysSince != null && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Day {daysSince}</span>}
               </div>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.375rem' }}>
-                {project.start_date && (
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    Started {format(parseISO(project.start_date), 'MMM d, yyyy')}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.375rem', alignItems: 'center' }}>
+                {editingStartDate ? (
+                  <form
+                    onSubmit={async e => {
+                      e.preventDefault()
+                      try {
+                        await api.patch(`/projects/${project.id}`, { start_date: new Date(startDateInput + 'T12:00:00').toISOString() })
+                        await load()
+                        toast.success('Start date updated')
+                      } catch {
+                        toast.error('Failed to update start date')
+                      } finally {
+                        setEditingStartDate(false)
+                      }
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                  >
+                    <input
+                      autoFocus
+                      type="date"
+                      value={startDateInput}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={e => setStartDateInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Escape' && setEditingStartDate(false)}
+                      style={{ fontSize: '0.78rem', border: '1px solid var(--amber)', borderRadius: '6px', padding: '0.2rem 0.5rem', background: 'var(--card-bg)', color: 'var(--text-primary)', outline: 'none' }}
+                    />
+                    <button type="submit" style={{ padding: '0.25rem', background: 'var(--amber)', border: 'none', borderRadius: '5px', cursor: 'pointer', color: 'var(--brown-dark)', display: 'flex', alignItems: 'center' }}>
+                      <Check size={13} />
+                    </button>
+                    <button type="button" onClick={() => setEditingStartDate(false)} style={{ padding: '0.25rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                      <X size={13} />
+                    </button>
+                  </form>
+                ) : (
+                  <span
+                    style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
+                    onClick={() => { setStartDateInput(project.start_date ? project.start_date.slice(0, 10) : new Date().toISOString().slice(0, 10)); setEditingStartDate(true) }}
+                    title="Edit start date"
+                  >
+                    Started {project.start_date ? format(parseISO(project.start_date), 'MMM d, yyyy') : '—'}
+                    <Pencil size={11} style={{ opacity: 0.5 }} />
                   </span>
                 )}
                 {project.end_date && (
