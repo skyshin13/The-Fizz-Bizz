@@ -2,7 +2,7 @@ import { useState } from 'react'
 import api from '../lib/api'
 import { useSugarTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { Calculator, FlaskConical, Zap } from 'lucide-react'
+import { AlertTriangle, Calculator, FlaskConical, Zap } from 'lucide-react'
 import styles from './CalculatorsPage.module.css'
 
 type Tab = 'abv' | 'priming'
@@ -151,7 +151,7 @@ function PrimingSugarCalculator() {
       <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1.75rem', border: '1px solid var(--border-light)' }}>
         <h2 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Priming Sugar Calculator</h2>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-          Calculate how much sugar to add for bottle carbonation. Factors in dissolved CO₂ at your fermentation temperature.
+          Calculate how much sugar to add for bottle carbonation. Factors in dissolved CO<sub>2</sub> at your fermentation temperature.
         </p>
 
         <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -164,12 +164,12 @@ function PrimingSugarCalculator() {
             <input type="number" step="0.001" value={form.current_gravity} onChange={set('current_gravity')} style={iStyle} />
           </div>
           <div>
-            <label style={lStyle}>Target CO₂ Volumes</label>
+            <label style={lStyle}>Target CO<sub>2</sub> Volumes</label>
             <input type="number" step="0.1" value={form.target_co2_volumes} onChange={set('target_co2_volumes')} style={iStyle} />
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>Beer: 2.4, Kombucha/soda: 3.0–3.5, Lager: 2.5</p>
           </div>
           <div>
-            <label style={lStyle}>Fermentation Temp (°F)</label>
+            <label style={lStyle}>Fermentation Temp (&deg;F)</label>
             <input type="number" step="1" value={form.fermentation_temp_celsius} onChange={set('fermentation_temp_celsius')} style={iStyle} />
           </div>
           <div>
@@ -196,7 +196,7 @@ function PrimingSugarCalculator() {
               <strong>Instructions:</strong><br />{result.notes}
             </div>
             <div style={{ padding: '0.875rem', background: '#b54a2c12', border: '1px solid #b54a2c30', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--rust)', lineHeight: 1.6 }}>
-              ⚠️ Always leave 2" headspace in bottles. Open one test bottle after 48h to check carbonation level.
+              <AlertTriangle size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} /> Always leave 2" headspace in bottles. Open one test bottle after 48h to check carbonation level.
             </div>
           </div>
         ) : (
