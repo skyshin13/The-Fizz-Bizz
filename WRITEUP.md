@@ -7,7 +7,7 @@
 
 ## 1. Mission
 
-Home fermenters — brewers, kombucha makers, kimchi fermenters, wine makers — track their batches across notebooks, spreadsheets, and memory. There is no single place to log measurements over time, visualize fermentation progress, set automated reminders, or share a batch with the community.
+Home fermenters — brewers, kombucha makers, food fermenters, wine makers — track their batches across notebooks, spreadsheets, and memory. There is no single place to log measurements over time, visualize fermentation progress, set automated reminders, or share a batch with the community.
 
 Fizz Bizz is a full-stack fermentation management platform that solves exactly that. Users create projects for any of 12 fermentation types, log pH, specific gravity, CO₂ pressure, temperature, and ABV over time, view live trend charts, and receive automated SMS/email reminders. A social layer — follows, likes, comments, and a public Explore feed — lets the fermentation community share and discover each other's batches. The platform also runs a continuous physics-based CO₂ simulation for alcohol fermentations so the chart updates even when no manual readings have been logged.
 
