@@ -810,6 +810,7 @@ function NoteModal({ projectId, onClose, onAdded }: { projectId: number; onClose
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [content, setContent] = useState('')
   const [tags, setTags] = useState('')
+  const [noteDate, setNoteDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -851,6 +852,7 @@ function NoteModal({ projectId, onClose, onAdded }: { projectId: number; onClose
         content,
         tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         photo_url,
+        created_at: new Date(noteDate + 'T12:00:00').toISOString(),
       })
       toast.success('Note added!')
       onAdded()
@@ -867,6 +869,10 @@ function NoteModal({ projectId, onClose, onAdded }: { projectId: number; onClose
         <div style={{ marginBottom: '1rem' }}>
           <label style={lStyle}>Observation *</label>
           <textarea required value={content} onChange={e => setContent(e.target.value)} placeholder="Describe what you see, smell, or taste..." style={{ ...iStyle, resize: 'vertical', minHeight: '80px' }} />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lStyle}>Date</label>
+          <input type="date" value={noteDate} onChange={e => setNoteDate(e.target.value)} max={new Date().toISOString().slice(0, 10)} style={iStyle} />
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label style={lStyle}>Photo</label>

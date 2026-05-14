@@ -356,7 +356,7 @@ def add_observation(
     if not project:
         raise HTTPException(404, "Project not found")
 
-    obs = ObservationNote(**body.model_dump(), project_id=project_id, user_id=current_user.id)
+    obs = ObservationNote(**body.model_dump(exclude_none=True), project_id=project_id, user_id=current_user.id)
     db.add(obs)
     db.commit()
     db.refresh(obs)
