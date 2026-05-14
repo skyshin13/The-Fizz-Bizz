@@ -559,6 +559,7 @@ function CommentItem({
             autoFocus
             value={replyText}
             onChange={e => onReplyTextChange(e.target.value)}
+            onFocus={e => { const len = e.target.value.length; e.target.setSelectionRange(len, len) }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmitReply(c.id) } if (e.key === 'Escape') onCancelReply() }}
             rows={2}
             style={{ flex: 1, padding: '0.5rem 0.75rem', border: '1px solid var(--amber)', borderRadius: '8px', background: 'var(--warm-white)', fontSize: '0.82rem', resize: 'none', fontFamily: 'DM Sans, sans-serif', outline: 'none' }}

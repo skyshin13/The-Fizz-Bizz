@@ -2,6 +2,12 @@
 
 A full-stack fermentation management platform for homebrewers, kombucha makers, and fermented food enthusiasts.
 
+## 🌍 Live Application
+
+**https://the-fizz-bizz.vercel.app/**
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |

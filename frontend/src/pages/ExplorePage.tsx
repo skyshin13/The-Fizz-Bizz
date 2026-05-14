@@ -497,6 +497,7 @@ function PublicProjectCard({
                           autoFocus
                           value={replyTexts[c.id] ?? ''}
                           onChange={e => setReplyTexts(prev => ({ ...prev, [c.id]: e.target.value }))}
+                          onFocus={e => { const len = e.target.value.length; e.target.setSelectionRange(len, len) }}
                           onKeyDown={e => { if (e.key === 'Escape') setReplyingToId(null) }}
                           style={{ flex: 1, padding: '0.35rem 0.5rem', border: '1px solid var(--amber)', borderRadius: '6px', background: 'var(--warm-white)', fontSize: '0.755rem', fontFamily: 'DM Sans, sans-serif', outline: 'none' }}
                         />
