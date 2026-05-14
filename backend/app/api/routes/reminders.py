@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Optional
 from app.db.database import get_db
 from app.models.models import Reminder, FermentationProject, User
@@ -20,6 +21,16 @@ class ReminderUpdate(BaseModel):
     phone_number: Optional[str] = None
     preferred_hour: Optional[int] = None
     preferred_minute: Optional[int] = None
+
+_EST = ZoneInfo("America/New_York")
+
+
+def _fmt_time(dt: datetime) -> str:
+    local = dt.astimezone(_EST)
+    dst = local.dst()
+    tz_label = "EDT" if dst and dst.total_seconds() > 0 else "EST"
+    return local.strftime(f"%A, %b %-d at %-I:%M %p {tz_label}")
+
 
 router = APIRouter(tags=["Reminders"])
 
@@ -115,7 +126,7 @@ def create_reminder(
 
     # ── Confirmation notification ─────────────────────────────────────────────
     if reminder.reminder_type != 'co2_limit':
-        fire_time = next_trigger.strftime("%A, %b %-d at %-I:%M %p UTC") if next_trigger else "when triggered"
+        fire_time = _fmt_time(next_trigger) if next_trigger else "when triggered"
         confirm_msg = (
             f'✅ Reminder set for "{project.name}"\n'
             f'You\'ll be notified {fire_time} (and every {body.interval_hours}h after):\n'
@@ -193,7 +204,7 @@ def update_reminder(
         if 'message' in updated_fields:
             lines.append(f'  • Message: "{reminder.message}"')
         if reminder.next_trigger_at:
-            lines.append(f'  • Next reminder: {reminder.next_trigger_at.strftime("%A, %b %-d at %-I:%M %p UTC")}')
+            lines.append(f'  • Next reminder: {_fmt_time(reminder.next_trigger_at)}')
 
         notify_msg = '\n'.join(lines)
         if reminder.email_enabled and current_user.email:

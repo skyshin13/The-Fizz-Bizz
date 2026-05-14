@@ -45,7 +45,9 @@ SIM_DT                 = 0.5      # internal simulation step (hours)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _is_kombucha(project) -> bool:
-    return project.fermentation_type.value == "kombucha"
+    ft = project.fermentation_type
+    val = ft if isinstance(ft, str) else ft.value
+    return val.lower() == "kombucha"
 
 
 def _resolve_strain(project, db) -> str:
@@ -211,7 +213,9 @@ def _tick():
         )
 
         for project in projects:
-            if project.fermentation_type.value not in SUPPORTED_TYPES:
+            ft = project.fermentation_type
+            ft_val = ft if isinstance(ft, str) else ft.value
+            if ft_val.lower() not in SUPPORTED_TYPES:
                 continue
 
             start = project.start_date
