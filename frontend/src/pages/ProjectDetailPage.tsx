@@ -1004,6 +1004,7 @@ function CompleteProjectModal({ project, isAlcohol, onClose, onCompleted }: {
 }
 
 function friendlyInterval(hours: number): string {
+  if (hours < 24) return `Every ${hours} hour${hours !== 1 ? 's' : ''}`
   if (hours >= 720 && hours % 720 === 0) {
     const n = hours / 720
     return `Every ${n} month${n !== 1 ? 's' : ''}`
@@ -1757,9 +1758,10 @@ function ReminderCard({ reminder, onDelete, onToggle, onEdit }: { reminder: Remi
   )
 }
 
-function hoursToUnit(hours: number): { count: string; unit: 'day' | 'week' | 'month' } {
+function hoursToUnit(hours: number): { count: string; unit: 'hour' | 'day' | 'week' | 'month' } {
   if (hours >= 720 && hours % 720 === 0) return { count: String(hours / 720), unit: 'month' }
   if (hours >= 168 && hours % 168 === 0) return { count: String(hours / 168), unit: 'week' }
+  if (hours < 24) return { count: String(hours), unit: 'hour' }
   return { count: String(Math.round(hours / 24) || 1), unit: 'day' }
 }
 
@@ -1774,7 +1776,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
     { value: 'look_at_project', label: '👀 Check on Project',    defaultMsg: 'Time to check on your fermentation — observe aroma, color, and activity!', defaultCount: '1', defaultUnit: 'day' as const },
   ]
 
-  const UNIT_HOURS = { day: 24, week: 168, month: 720 }
+  const UNIT_HOURS = { hour: 1, day: 24, week: 168, month: 720 }
 
   const initFromExisting = () => {
     const defaultPsi = cerThreshold || '10'
@@ -1914,16 +1916,17 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
               </select>
               <select
                 value={form.interval_unit}
-                onChange={e => setForm(prev => ({ ...prev, interval_unit: e.target.value as 'day' | 'week' | 'month' }))}
+                onChange={e => setForm(prev => ({ ...prev, interval_unit: e.target.value as 'hour' | 'day' | 'week' | 'month' }))}
                 style={{ ...iStyle, flex: 1, cursor: 'pointer' }}
               >
+                <option value="hour">{parseInt(form.interval_count) === 1 ? 'Hour' : 'Hours'}</option>
                 <option value="day">{parseInt(form.interval_count) === 1 ? 'Day' : 'Days'}</option>
                 <option value="week">{parseInt(form.interval_count) === 1 ? 'Week' : 'Weeks'}</option>
                 <option value="month">{parseInt(form.interval_count) === 1 ? 'Month' : 'Months'}</option>
               </select>
             </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-              Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; {Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hours
+              Every {form.interval_count} {form.interval_unit}{parseInt(form.interval_count) !== 1 ? 's' : ''} &middot; first reminder in ~{Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit]} hour{Math.max(1, parseInt(form.interval_count) || 1) * UNIT_HOURS[form.interval_unit] !== 1 ? 's' : ''}
             </p>
           </div>
         )}
