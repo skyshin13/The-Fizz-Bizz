@@ -901,18 +901,53 @@ function NoteModal({ projectId, onClose, onAdded }: { projectId: number; onClose
 }
 
 function ObservationRow({ obs, projectId, onSaved }: { obs: { id: number; content: string; tags?: string[]; photo_url?: string | null; created_at: string }; projectId: string; onSaved: () => void }) {
+  const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState(obs.content)
   const [dateVal, setDateVal] = useState(obs.created_at.slice(0, 10))
+  const [photoUrl, setPhotoUrl] = useState<string | null>(obs.photo_url ?? null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const removePhoto = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setPhotoUrl(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const save = async () => {
     setSaving(true)
     try {
+      let finalPhotoUrl = photoUrl
+
+      if (photoFile && user) {
+        const ext = photoFile.name.split('.').pop()
+        const path = `${user.id}/obs-${Date.now()}.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('project-photos')
+          .upload(path, photoFile, { upsert: true })
+        if (uploadError) {
+          toast.error('Photo upload failed — saving note without new photo.')
+        } else {
+          const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(path)
+          finalPhotoUrl = urlData.publicUrl
+        }
+      }
+
       await api.patch(`/projects/${projectId}/observations/${obs.id}`, {
         content,
         tags: obs.tags ?? [],
-        photo_url: obs.photo_url ?? null,
+        photo_url: finalPhotoUrl,
         created_at: new Date(dateVal + 'T12:00:00').toISOString(),
       })
       toast.success('Note updated')
@@ -928,14 +963,16 @@ function ObservationRow({ obs, projectId, onSaved }: { obs: { id: number; conten
   const cancel = () => {
     setContent(obs.content)
     setDateVal(obs.created_at.slice(0, 10))
+    setPhotoUrl(obs.photo_url ?? null)
+    setPhotoFile(null)
+    setPhotoPreview(null)
     setEditing(false)
   }
 
+  const displayPhoto = photoPreview ?? photoUrl
+
   return (
     <div style={{ paddingBottom: '0.875rem', borderBottom: '1px solid var(--border-light)' }}>
-      {obs.photo_url && (
-        <img src={obs.photo_url} alt="" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px', marginBottom: '0.5rem' }} />
-      )}
       {editing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <textarea
@@ -943,6 +980,19 @@ function ObservationRow({ obs, projectId, onSaved }: { obs: { id: number; conten
             onChange={e => setContent(e.target.value)}
             style={{ width: '100%', padding: '0.5rem 0.625rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--warm-white)', fontSize: '0.875rem', resize: 'vertical', minHeight: '64px', color: 'var(--text-primary)', boxSizing: 'border-box' }}
           />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+          {displayPhoto ? (
+            <div style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', height: '100px' }}>
+              <img src={displayPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button type="button" onClick={removePhoto} style={{ position: 'absolute', top: 5, right: 5, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => fileInputRef.current?.click()} style={{ width: '100%', padding: '0.5rem', border: '2px dashed var(--border)', borderRadius: '6px', background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: '0.8rem' }}>
+              <ImagePlus size={14} /> Add photo
+            </button>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Date</label>
             <input
@@ -961,6 +1011,9 @@ function ObservationRow({ obs, projectId, onSaved }: { obs: { id: number; conten
         </div>
       ) : (
         <>
+          {obs.photo_url && (
+            <img src={obs.photo_url} alt="" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px', marginBottom: '0.5rem' }} />
+          )}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
             <p style={{ fontSize: '0.875rem', marginBottom: '0.375rem', flex: 1 }}>{obs.content}</p>
             <button onClick={() => setEditing(true)} style={{ flexShrink: 0, padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: '4px' }} title="Edit note">
