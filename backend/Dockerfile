@@ -2,12 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
-
-COPY requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
-
+COPY pyproject.toml .
 COPY app/ ./app/
+
+RUN pip install --no-cache-dir .
+
 COPY docker_start.sh .
 RUN chmod +x docker_start.sh
 
