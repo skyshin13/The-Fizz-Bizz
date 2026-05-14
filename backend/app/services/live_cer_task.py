@@ -25,22 +25,36 @@ from app.models.models import (
 )
 from app.services.cer_engine import (
     STRAIN_MAP, CERState, initial_cer_state, step_cer,
+    KOMBUCHA_STRAIN_MAP, KombuchaCERState,
+    initial_kombucha_cer_state, step_cer_kombucha,
 )
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-INTERVAL_SECONDS    = 60
-CO2_TO_PSI          = 3000.0    # converts Σ(cer·dt) → PSI (scaled for Yco2/Yxs-based CER)
-DEFAULT_STRAIN      = "US-05"
-SUPPORTED_TYPES     = {"beer", "mead", "cider", "wine", "alcohol_brewing"}
-BACKFILL_INTERVAL_H = 1.0       # one backfill point per hour for offline gaps
-SIM_DT              = 0.5       # internal simulation step (hours)
+INTERVAL_SECONDS       = 60
+CO2_TO_PSI             = 3000.0   # Σ(cer·dt) → PSI for yeast/alcohol ferments
+KOMBUCHA_CO2_TO_PSI    = 6000.0   # kombucha CO2 display scaling (open vessel; ~5 PSI over 14d)
+DEFAULT_STRAIN         = "US-05"
+DEFAULT_KOMBUCHA_STRAIN = "SCOBY-GT"
+SUPPORTED_TYPES        = {"beer", "mead", "cider", "wine", "alcohol_brewing", "kombucha"}
+BACKFILL_INTERVAL_H    = 1.0      # one backfill point per hour for offline gaps
+SIM_DT                 = 0.5      # internal simulation step (hours)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _is_kombucha(project) -> bool:
+    return project.fermentation_type.value == "kombucha"
+
+
 def _resolve_strain(project, db) -> str:
+    if _is_kombucha(project):
+        # Map Jun SCOBY by description keyword; default to GT's black-tea strain
+        desc = (project.description or "").lower()
+        if "jun" in desc or "green tea" in desc or "honey" in (project.name or "").lower():
+            return "SCOBY-JUN"
+        return DEFAULT_KOMBUCHA_STRAIN
     conn = db.query(ProjectYeastConnection).filter_by(project_id=project.id).first()
     if not conn:
         return DEFAULT_STRAIN
@@ -73,6 +87,10 @@ def _resolve_strain(project, db) -> str:
 def _estimate_sugar_g(project) -> float:
     if getattr(project, 'sugar_amount_grams', None):
         return float(project.sugar_amount_grams)
+    if _is_kombucha(project):
+        # Standard kombucha: ~65 g sugar/L (Jayabalan 2014; typical 1F recipe)
+        vol_l = project.batch_size_liters or 3.8
+        return 65.0 * vol_l
     og    = project.initial_gravity or 1.050
     vol_l = project.batch_size_liters or 19.0
     return max(50.0, (og - 1.0) * 2500 * vol_l)
@@ -117,14 +135,32 @@ def _create_initial_state(project, db, now: datetime) -> ProjectCERState:
     elapsed_hours = max(0.0, (now - start).total_seconds() / 3600.0)
 
     # Advance sim to current elapsed time for realistic X, S state
-    state = initial_cer_state(strain_id, sugar_g, volume_ml)
-    psi   = 0.0
-    t     = 0.0
-    while t < elapsed_hours:
-        dt    = min(SIM_DT, elapsed_hours - t)
-        state, cer = step_cer(strain_id, state, temp_c, dt)
-        psi  += cer * dt / CO2_TO_PSI
-        t    += dt
+    psi = 0.0
+    t   = 0.0
+    is_kb = _is_kombucha(project)
+    psi_scale = KOMBUCHA_CO2_TO_PSI if is_kb else CO2_TO_PSI
+    if is_kb:
+        kb_state = initial_kombucha_cer_state(strain_id, sugar_g, volume_ml)
+        while t < elapsed_hours:
+            dt = min(SIM_DT, elapsed_hours - t)
+            kb_state, cer = step_cer_kombucha(strain_id, kb_state, temp_c, dt)
+            psi += cer * dt / psi_scale
+            t   += dt
+        state = CERState(
+            X=kb_state.X_y, S=kb_state.S,
+            ethanol_est=kb_state.E,
+            elapsed_t=kb_state.elapsed_t,
+            phase=kb_state.phase,
+        )
+        x_bact_val = kb_state.X_b
+    else:
+        state = initial_cer_state(strain_id, sugar_g, volume_ml)
+        while t < elapsed_hours:
+            dt    = min(SIM_DT, elapsed_hours - t)
+            state, cer = step_cer(strain_id, state, temp_c, dt)
+            psi  += cer * dt / psi_scale
+            t    += dt
+        x_bact_val = 0.0
 
     # Use existing last measurement as PSI baseline to avoid discontinuity
     last_meas = (
@@ -145,6 +181,7 @@ def _create_initial_state(project, db, now: datetime) -> ProjectCERState:
         volume_ml      = volume_ml,
         temperature_c  = temp_c,
         X              = state.X,
+        X_bact         = x_bact_val,
         S              = state.S,
         ethanol_est    = state.ethanol_est,
         elapsed_t      = state.elapsed_t,
@@ -202,14 +239,26 @@ def _tick():
 
             gap_hours = max(0.0, (now - last_tick).total_seconds() / 3600.0)
 
-            # Reconstruct in-memory CERState from persisted values
-            cer_state = CERState(
-                X           = state_row.X,
-                S           = state_row.S,
-                ethanol_est = state_row.ethanol_est,
-                elapsed_t   = state_row.elapsed_t,
-                phase       = state_row.phase,
-            )
+            is_kb     = _is_kombucha(project)
+            psi_scale = KOMBUCHA_CO2_TO_PSI if is_kb else CO2_TO_PSI
+
+            # Reconstruct in-memory state from persisted values
+            if is_kb:
+                sim_state = KombuchaCERState(
+                    X_y=state_row.X,
+                    X_b=getattr(state_row, 'X_bact', 0.03) or 0.03,
+                    S=state_row.S,
+                    E=state_row.ethanol_est,
+                    elapsed_t=state_row.elapsed_t,
+                    phase=state_row.phase,
+                )
+            else:
+                sim_state = CERState(
+                    X=state_row.X, S=state_row.S,
+                    ethanol_est=state_row.ethanol_est,
+                    elapsed_t=state_row.elapsed_t,
+                    phase=state_row.phase,
+                )
 
             # Only look back far enough to cover the gap + a 10-min overlap buffer.
             # This keeps the duplicate-check set small regardless of total history length.
@@ -224,10 +273,15 @@ def _tick():
 
             while sim_elapsed < gap_hours:
                 dt = min(SIM_DT, gap_hours - sim_elapsed)
-                cer_state, cer_val = step_cer(
-                    state_row.strain_id, cer_state, state_row.temperature_c, dt
-                )
-                state_row.psi_cumulative += cer_val * dt / CO2_TO_PSI
+                if is_kb:
+                    sim_state, cer_val = step_cer_kombucha(
+                        state_row.strain_id, sim_state, state_row.temperature_c, dt
+                    )
+                else:
+                    sim_state, cer_val = step_cer(
+                        state_row.strain_id, sim_state, state_row.temperature_c, dt
+                    )
+                state_row.psi_cumulative += cer_val * dt / psi_scale
                 sim_elapsed += dt
 
                 # Backfill: one stored point per BACKFILL_INTERVAL_H (offline gap)
@@ -260,11 +314,19 @@ def _tick():
                 ))
 
             # ── Persist updated state ─────────────────────────────────────────
-            state_row.X           = cer_state.X
-            state_row.S           = cer_state.S
-            state_row.ethanol_est = cer_state.ethanol_est
-            state_row.elapsed_t   = cer_state.elapsed_t
-            state_row.phase       = cer_state.phase
+            if is_kb:
+                state_row.X           = sim_state.X_y
+                state_row.X_bact      = sim_state.X_b
+                state_row.S           = sim_state.S
+                state_row.ethanol_est = sim_state.E
+                state_row.elapsed_t   = sim_state.elapsed_t
+                state_row.phase       = sim_state.phase
+            else:
+                state_row.X           = sim_state.X
+                state_row.S           = sim_state.S
+                state_row.ethanol_est = sim_state.ethanol_est
+                state_row.elapsed_t   = sim_state.elapsed_t
+                state_row.phase       = sim_state.phase
             state_row.last_tick_at = now
 
         db.commit()

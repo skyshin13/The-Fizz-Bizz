@@ -22,8 +22,14 @@ interface SharedMeasurement {
 
 interface SharedObservation {
   content: string
-  photo_url: string | null
   created_at: string
+}
+
+interface AlbumPhoto {
+  id: number
+  url: string
+  caption: string | null
+  taken_at: string
 }
 
 interface SharedYeast {
@@ -55,6 +61,7 @@ interface PublicProjectDetail {
   author_avatar_url: string | null
   measurements: SharedMeasurement[]
   observations: SharedObservation[]
+  photos: AlbumPhoto[]
   yeast_strain: SharedYeast | null
   like_count: number
   is_liked_by_me: boolean
@@ -183,7 +190,6 @@ export default function PublicProjectViewPage() {
   const daysSince = project.start_date
     ? Math.floor((Date.now() - new Date(project.start_date).getTime()) / 86400000)
     : null
-  const photos = project.observations.filter(o => o.photo_url)
   const author = project.author_display_name || project.author_username
 
   return (
@@ -264,6 +270,18 @@ export default function PublicProjectViewPage() {
           </button>
         </div>
       </div>
+
+      {/* Cover photo */}
+      {project.cover_photo_url && (
+        <div className="fade-in" style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '1.25rem', maxHeight: '320px' }}>
+          <img
+            src={project.cover_photo_url}
+            alt="Cover"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in', display: 'block' }}
+            onClick={() => setLightbox(project.cover_photo_url!)}
+          />
+        </div>
+      )}
 
       {/* Description */}
       {project.description && (
@@ -365,23 +383,23 @@ export default function PublicProjectViewPage() {
         </div>
       )}
 
-      {/* Photo log */}
-      {photos.length > 0 && (
+      {/* Album photos */}
+      {project.photos.length > 0 && (
         <div className="fade-in-delay-2" style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Photo Log ({photos.length})
+            Photos ({project.photos.length})
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.625rem' }}>
-            {photos.map((o, i) => (
+            {project.photos.map((p) => (
               <div
-                key={i}
-                onClick={() => setLightbox(o.photo_url!)}
+                key={p.id}
+                onClick={() => setLightbox(p.url)}
                 style={{ borderRadius: '10px', overflow: 'hidden', aspectRatio: '1', cursor: 'zoom-in', background: 'var(--parchment)', position: 'relative' }}
               >
-                <img src={o.photo_url!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                {o.content && (
+                <img src={p.url} alt={p.caption || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {p.caption && (
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.55))', padding: '1.5rem 0.5rem 0.4rem', fontSize: '0.68rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {o.content}
+                    {p.caption}
                   </div>
                 )}
               </div>

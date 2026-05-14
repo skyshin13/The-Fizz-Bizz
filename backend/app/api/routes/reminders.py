@@ -6,6 +6,8 @@ from app.db.database import get_db
 from app.models.models import Reminder, FermentationProject, User
 from app.schemas.schemas import ReminderCreate, ReminderOut
 from app.api.deps import get_current_user
+from app.services.sendgrid_service import send_email
+from app.services.twilio_service import send_sms
 from pydantic import BaseModel
 
 
@@ -109,6 +111,24 @@ def create_reminder(
     db.add(reminder)
     db.commit()
     db.refresh(reminder)
+
+    # ── Confirmation notification ─────────────────────────────────────────────
+    if reminder.reminder_type != 'co2_limit':
+        fire_time = next_trigger.strftime("%A, %b %-d at %-I:%M %p UTC") if next_trigger else "when triggered"
+        confirm_msg = (
+            f'✅ Reminder set for "{project.name}"\n'
+            f'You\'ll be notified {fire_time} (and every {body.interval_hours}h after):\n'
+            f'"{reminder.message}"'
+        )
+        if reminder.email_enabled and current_user.email:
+            send_email(
+                current_user.email,
+                f'Fizz Bizz — Reminder Created: {project.name}',
+                confirm_msg,
+            )
+        if reminder.sms_enabled and phone:
+            send_sms(phone, confirm_msg)
+
     return reminder
 
 

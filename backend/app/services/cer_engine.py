@@ -338,12 +338,17 @@ STRAIN_MAP = {s.id: s for s in STRAINS}
 
 # ─── Helper functions ────────────────────────────────────────────────────────
 
+def _calc_temp_factor(temp_c: float, opt_temp_c: float,
+                      temp_min_c: float, temp_max_c: float) -> float:
+    if temp_c < temp_min_c or temp_c > temp_max_c:
+        return 0.0
+    sigma = (temp_max_c - temp_min_c) / 4.0
+    return math.exp(-0.5 * ((temp_c - opt_temp_c) / sigma) ** 2)
+
+
 def temp_factor(strain: YeastStrain, temp_c: float) -> float:
     """Gaussian bell-curve centred on opt_temp_c, zero outside viable range."""
-    if temp_c < strain.temp_min_c or temp_c > strain.temp_max_c:
-        return 0.0
-    sigma = (strain.temp_max_c - strain.temp_min_c) / 4.0
-    return math.exp(-0.5 * ((temp_c - strain.opt_temp_c) / sigma) ** 2)
+    return _calc_temp_factor(temp_c, strain.opt_temp_c, strain.temp_min_c, strain.temp_max_c)
 
 
 def _monod(S: float, Ks: float) -> float:
@@ -573,3 +578,405 @@ def step_cer(
         phase=_classify_phase(t_new, mu, X_new, S_new, strain),
     )
     return new_state, round(max(0.0, cer), 4)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# KOMBUCHA MODEL — Coupled Yeast + Acetic Acid Bacteria (AAB) ODE System
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Scientific basis
+# ────────────────
+# Kombucha fermentation is driven by a SCOBY (Symbiotic Culture Of Bacteria
+# and Yeast).  Two microbial guilds dominate:
+#
+#   Yeast guild   — Brettanomyces bruxellensis, Zygosaccharomyces bailii,
+#                   Torulaspora delbrueckii (depending on SCOBY origin)
+#                   Ferments sucrose → ethanol + CO₂  (Gay-Lussac pathway)
+#
+#   AAB guild     — Komagataeibacter xylinus (main cellulose/pellicle former),
+#                   Acetobacter pasteurianus, Gluconobacter oxydans
+#                   Oxidises ethanol → acetic acid at the O₂-rich pellicle
+#                   surface.  This reaction produces NO CO₂.
+#
+# Key consequence: ethanol never accumulates to yeast-inhibiting levels because
+# AAB consume it continuously → the ethanol inhibition term has a much lower
+# effective ceiling than in beer (12 g/L vs 80+ g/L for ale yeast).
+#
+# CO₂ is produced *only* by yeast.  The resulting curve is broader and lower
+# than an ale fermentation, reflecting the multi-week 1F kombucha window.
+#
+# References
+# ──────────
+# [1] Jayabalan R. et al. (2014) "A Review on Kombucha Tea — Microbiology,
+#     Composition, Fermentation, Beneficial Effects, Toxicity, and Tea Fungus"
+#     Compr. Rev. Food Sci. Food Saf. 13:538–550.
+#     → Yeast μ_max fitted from their Fig. 2 pH/sugar curves at 25 °C
+#
+# [2] Chakravorty S. et al. (2016) "Kombucha tea fermentation: Microbial and
+#     biochemical dynamics" J. Food Biochem. 40:220–233.
+#     → Consortium composition; substrate consumption kinetics
+#
+# [3] Raspor P. & Goranovič D. (2008) "Biotechnological Applications of
+#     Acetic Acid Bacteria" Crit. Rev. Biotechnol. 28:101–124.
+#     → Komagataeibacter μ_max ~0.25 h⁻¹ in free solution; O₂ surface
+#       limitation reduces effective rate 60 % → 0.10 h⁻¹ in bulk kombucha
+#
+# [4] Loncar E. et al. (2014) "Influence of working conditions upon kombucha
+#     conducted fermentation on black tea" Chem. Ind. Chem. Eng. Q. 20:131–138.
+#     → Sucrose Ks 3–4 g/L; fermentation kinetics at varying temperatures
+#
+# [5] Sokollek S.J. et al. (1998) "Description of two strains of Acetobacter
+#     with amended descriptions of the species" Int. J. Syst. Bacteriol.
+#     → Acetobacter ethanol Ks 1–4 g/L; Yxe 0.03–0.05 g/g
+#
+# [6] Gay-Lussac stoichiometry: C₆H₁₂O₆ → 2 C₂H₅OH + 2 CO₂
+#     Yco2_theoretical = 2×44/180 = 0.489 g/g glucose
+#     For sucrose feed: ×0.974 (MW correction) = 0.476 g/g sucrose consumed
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class KombuchaStrain:
+    id:               str
+    name:             str
+    brand:            str
+    fermentation_class: str   # always "kombucha"
+    strain_type:      str     # "SCOBY" — for UI compatibility
+
+    # ── Yeast guild kinetics (Monod on sucrose) ──────────────────────────────
+    mu_max_y:   float   # h⁻¹  max specific growth rate at opt_temp_c  [1,2]
+    Ks_y:       float   # g/L  sucrose half-saturation constant        [4]
+    Yxs_y:      float   # g/g  biomass yield on substrate
+    Yco2_y:     float   # g/g  CO₂ yield on substrate                 [6]
+    Yethanol_y: float   # g/g  ethanol yield on substrate              [6]
+    E_max_y:    float   # g/L  ethanol conc. → yeast growth = 0       [1]
+    X0_y:       float   # g/L  initial yeast biomass (from SCOBY)
+    X_max_y:    float   # g/L  yeast carrying capacity
+    k_d_y:      float   # h⁻¹  yeast decay rate
+    t_lag_y:    float   # h    yeast lag-phase time constant          [1]
+
+    # ── Acetic acid bacteria (AAB) kinetics (Monod on ethanol) ───────────────
+    mu_max_b:   float   # h⁻¹  effective μ_max (O₂-surface-limited)   [3]
+    Ks_b:       float   # g/L  ethanol half-saturation for AAB        [5]
+    Yxe_b:      float   # g/g  AAB biomass yield on ethanol           [5]
+    X0_b:       float   # g/L  initial AAB biomass (from SCOBY)
+    X_max_b:    float   # g/L  AAB carrying capacity (pellicle-bound)
+    k_d_b:      float   # h⁻¹  AAB decay rate
+    t_lag_b:    float   # h    AAB lag (shorter; already active)
+
+    # ── Temperature ──────────────────────────────────────────────────────────
+    opt_temp_c:   float  # °C  yeast guild optimum                    [4]
+    opt_temp_b_c: float  # °C  AAB guild optimum (slightly warmer)    [3]
+    temp_min_c:   float
+    temp_max_c:   float
+
+    ethanol_tol:  float  # % ABV display only
+    description:  str = ""
+
+
+KOMBUCHA_STRAINS: List[KombuchaStrain] = [
+
+    KombuchaStrain(
+        id="SCOBY-GT",
+        name="GT's Original SCOBY (Black Tea)",
+        brand="GT's Kombucha Culture",
+        fermentation_class="kombucha",
+        strain_type="SCOBY",
+        # Yeast guild — fitted from Jayabalan 2014 Fig. 2 at 25 °C [1]
+        # μ_max notably lower than ale yeast (0.38) due to mixed-culture
+        # competition and atypical yeast species (Brettanomyces/Zygosaccharomyces)
+        mu_max_y=0.18, Ks_y=3.5,
+        Yxs_y=0.07, Yco2_y=0.476, Yethanol_y=0.450,
+        E_max_y=12.0,   # AAB keep bulk ethanol <3 % → inhibition ceiling ~12 g/L [1]
+        X0_y=0.10,      # established SCOBY; higher than pitched dry yeast (0.05)
+        X_max_y=3.0, k_d_y=0.005, t_lag_y=6.0,
+        # AAB guild — Raspor & Goranovič 2008 [3]; Sokollek 1998 [5]
+        # Free-solution μ_max ~0.25 h⁻¹; O₂ surface-diffusion limits effective
+        # rate to ~40 % in bulk kombucha → 0.10 h⁻¹
+        mu_max_b=0.10, Ks_b=2.5, Yxe_b=0.04,
+        X0_b=0.03, X_max_b=1.0, k_d_b=0.006, t_lag_b=3.0,
+        opt_temp_c=25, opt_temp_b_c=28, temp_min_c=18, temp_max_c=32,
+        ethanol_tol=3.0,
+        description=(
+            "Traditional black-tea kombucha SCOBY. Broad, low CO₂ curve over 7–14 days. "
+            "AAB continuously oxidise ethanol → acetic acid, keeping ABV <3 %."
+        ),
+    ),
+
+    KombuchaStrain(
+        id="SCOBY-JUN",
+        name="Jun SCOBY (Green Tea & Honey)",
+        brand="Jun Culture",
+        fermentation_class="kombucha",
+        strain_type="SCOBY",
+        # Jun SCOBYs host Torulaspora delbrueckii and Lachancea fermentati,
+        # adapted to honey (free fructose + glucose) → lower Ks than sucrose [2]
+        # Slightly lower μ_max_y than GT's due to different species mix
+        mu_max_y=0.16, Ks_y=2.0,   # honey is pre-inverted; Ks lower than sucrose
+        Yxs_y=0.07, Yco2_y=0.476, Yethanol_y=0.448,
+        E_max_y=10.0,   # slightly more sensitive to ethanol
+        X0_y=0.10, X_max_y=2.8, k_d_y=0.005, t_lag_y=5.0,
+        mu_max_b=0.09, Ks_b=2.2, Yxe_b=0.04,
+        X0_b=0.03, X_max_b=0.9, k_d_b=0.006, t_lag_b=3.0,
+        opt_temp_c=24, opt_temp_b_c=27, temp_min_c=18, temp_max_c=30,
+        ethanol_tol=2.5,
+        description=(
+            "Jun SCOBY on green tea + honey. Faster pH drop than black-tea kombucha. "
+            "Lower Ks reflects honey's pre-inverted fructose/glucose substrate."
+        ),
+    ),
+]
+
+KOMBUCHA_STRAIN_MAP: dict = {s.id: s for s in KOMBUCHA_STRAINS}
+
+
+# ─── Kombucha ODE system ─────────────────────────────────────────────────────
+
+def _kombucha_odes(t: float, y: List[float], strain: KombuchaStrain,
+                   tf_y: float, tf_b: float) -> List[float]:
+    """
+    Four-dimensional ODE for kombucha SCOBY fermentation.
+
+    State  y = [X_y, X_b, S, E]
+      X_y  g/L  yeast guild biomass
+      X_b  g/L  AAB guild biomass
+      S    g/L  sucrose (or glucose-equiv.) remaining
+      E    g/L  ethanol (produced by yeast, consumed by AAB)
+
+    Equations
+    ─────────
+      μ_y  = μ_max_y · S/(Ks_y+S) · (1−E/E_max_y) · tf_y · lag_adapt(t, t_lag_y)
+      μ_b  = μ_max_b · E/(Ks_b+E) · tf_b · lag_adapt(t, t_lag_b)
+
+      dX_y/dt = [μ_y · (1−X_y/X_max_y) − k_d_y] · X_y
+      dX_b/dt = [μ_b · (1−X_b/X_max_b) − k_d_b] · X_b
+      dS/dt   = −(1/Yxs_y) · μ_y · X_y
+      dE/dt   =  Yethanol_y · (1/Yxs_y) · μ_y · X_y   ← yeast production
+                −(1/Yxe_b)  · μ_b · X_b               ← AAB consumption
+
+    CO₂ produced by yeast only (AAB oxidation: EtOH + O₂ → AcOH + H₂O, no CO₂):
+      CER = Yco2_y · (1/Yxs_y) · μ_y · X_y · 1000    [mg CO₂ / L / h]
+
+    References: see module docstring [1]–[6].
+    """
+    X_y = max(y[0], 0.0)
+    X_b = max(y[1], 0.0)
+    S   = max(y[2], 0.0)
+    E   = max(y[3], 0.0)
+
+    lag_y = _lag_adapt(t, strain.t_lag_y)
+    lag_b = _lag_adapt(t, strain.t_lag_b)
+
+    mu_y = (strain.mu_max_y
+            * _monod(S, strain.Ks_y)
+            * max(0.0, 1.0 - E / strain.E_max_y)
+            * tf_y * lag_y)
+
+    mu_b = (strain.mu_max_b
+            * _monod(E, strain.Ks_b)   # AAB grows on ethanol as sole C-source
+            * tf_b * lag_b)
+
+    mu_net_y = mu_y * max(0.0, 1.0 - X_y / strain.X_max_y) - strain.k_d_y
+    mu_net_b = mu_b * max(0.0, 1.0 - X_b / strain.X_max_b) - strain.k_d_b
+
+    substrate_uptake_y = mu_y * X_y / strain.Yxs_y    # g sucrose L⁻¹ h⁻¹
+    ethanol_uptake_b   = mu_b * X_b / strain.Yxe_b    # g ethanol L⁻¹ h⁻¹
+
+    dX_y = mu_net_y * X_y
+    dX_b = mu_net_b * X_b
+    dS   = -substrate_uptake_y
+    dE   = strain.Yethanol_y * substrate_uptake_y - ethanol_uptake_b
+
+    return [dX_y, dX_b, dS, dE]
+
+
+def _kombucha_phase(t: float, X_y: float, S: float,
+                    strain: KombuchaStrain) -> str:
+    if t < strain.t_lag_y * 0.7:
+        return "lag"
+    if S > strain.Ks_y * 2 and X_y < strain.X_max_y * 0.9:
+        return "exponential"
+    if S < strain.Ks_y * 0.5:
+        return "decline"
+    return "stationary"
+
+
+# ─── Batch simulation for kombucha ───────────────────────────────────────────
+
+def simulate_cer_kombucha(
+    strain_id: str,
+    sugar_g: float,
+    volume_ml: float,
+    temperature_c: float,
+    duration_hours: float = 336.0,   # 14 days — typical kombucha 1F window
+    dt: float = 1.0,
+    alert_threshold: float = 50.0,   # lower threshold; kombucha CER is gentler
+) -> CERResult:
+    """
+    Batch CO₂ simulation for kombucha using the coupled yeast+AAB ODE system.
+    Uses scipy Radau solver (stiff-safe) identical to simulate_cer().
+    Default duration is 336 h (14 days) to cover the full 1F window.
+    """
+    strain = KOMBUCHA_STRAIN_MAP.get(strain_id)
+    if strain is None:
+        raise ValueError(f"Unknown kombucha strain: {strain_id}")
+
+    volume_L = volume_ml / 1000.0
+    S0 = sugar_g / volume_L
+
+    tf_y = _calc_temp_factor(temperature_c, strain.opt_temp_c,
+                              strain.temp_min_c, strain.temp_max_c)
+    tf_b = _calc_temp_factor(temperature_c, strain.opt_temp_b_c,
+                              strain.temp_min_c, strain.temp_max_c)
+
+    y0 = [strain.X0_y, strain.X0_b, S0, 0.0]   # [X_y, X_b, S, E]
+
+    n_points = min(max(int(duration_hours / dt), 60), 500)
+    t_eval = np.linspace(0, duration_hours, n_points)
+
+    sol = solve_ivp(
+        fun=lambda t, y: _kombucha_odes(t, y, strain, tf_y, tf_b),
+        t_span=(0.0, duration_hours),
+        y0=y0,
+        method="Radau",
+        t_eval=t_eval,
+        rtol=1e-4,
+        atol=1e-6,
+        dense_output=False,
+    )
+
+    points: List[CERPoint] = []
+    total_co2 = 0.0
+    peak_cer  = 0.0
+    peak_t    = 0.0
+    alert_triggered = False
+    alert_t   = None
+    prev_t    = 0.0
+
+    for i, t in enumerate(sol.t):
+        X_y = max(sol.y[0, i], 0.0)
+        X_b = max(sol.y[1, i], 0.0)  # noqa: F841 (stored for completeness)
+        S   = max(sol.y[2, i], 0.0)
+        E   = max(sol.y[3, i], 0.0)
+
+        lag_y = _lag_adapt(t, strain.t_lag_y)
+        mu_y  = (strain.mu_max_y
+                 * _monod(S, strain.Ks_y)
+                 * max(0.0, 1.0 - E / strain.E_max_y)
+                 * tf_y * lag_y)
+
+        substrate_uptake_y = mu_y * X_y / strain.Yxs_y
+        cer = strain.Yco2_y * substrate_uptake_y * 1000.0   # mg CO₂/L/h
+
+        step_dt = t - prev_t if i > 0 else 0.0
+        total_co2 += cer * step_dt
+        prev_t = t
+
+        if cer > peak_cer:
+            peak_cer = cer
+            peak_t   = t
+
+        if cer >= alert_threshold and not alert_triggered:
+            alert_triggered = True
+            alert_t = t
+
+        points.append(CERPoint(
+            t=round(t, 2),
+            cer=round(cer, 4),
+            phase=_kombucha_phase(t, X_y, S, strain),
+        ))
+
+    return CERResult(
+        points=points,
+        peak_cer=round(peak_cer, 4),
+        peak_t=round(peak_t, 2),
+        alert_triggered=alert_triggered,
+        alert_t=round(alert_t, 2) if alert_t is not None else None,
+        strain_id=strain_id,
+        strain_name=strain.name,
+        total_co2_mg_per_L=round(total_co2, 2),
+    )
+
+
+# ─── Stateful kombucha step (live tick) ──────────────────────────────────────
+
+@dataclass
+class KombuchaCERState:
+    X_y:       float   # g/L  yeast biomass
+    X_b:       float   # g/L  AAB biomass
+    S:         float   # g/L  substrate remaining
+    E:         float   # g/L  ethanol
+    elapsed_t: float   # h    hours since fermentation start
+    phase:     str
+
+
+def initial_kombucha_cer_state(strain_id: str, sugar_g: float,
+                                volume_ml: float) -> KombuchaCERState:
+    strain = KOMBUCHA_STRAIN_MAP.get(strain_id) or KOMBUCHA_STRAINS[0]
+    S0 = sugar_g / max(volume_ml / 1000.0, 0.001)
+    return KombuchaCERState(
+        X_y=strain.X0_y, X_b=strain.X0_b,
+        S=S0, E=0.0, elapsed_t=0.0, phase="lag",
+    )
+
+
+def step_cer_kombucha(
+    strain_id: str,
+    state: KombuchaCERState,
+    temp_c: float,
+    dt: float = 0.5,
+) -> Tuple[KombuchaCERState, float]:
+    """
+    Euler step for the live kombucha CER simulation.
+    Mirrors step_cer() but uses the 4-state (X_y, X_b, S, E) system.
+    Returns (new_state, cer_mg_L_h).
+    """
+    strain = KOMBUCHA_STRAIN_MAP.get(strain_id) or KOMBUCHA_STRAINS[0]
+
+    tf_y = _calc_temp_factor(temp_c, strain.opt_temp_c,
+                              strain.temp_min_c, strain.temp_max_c)
+    tf_b = _calc_temp_factor(temp_c, strain.opt_temp_b_c,
+                              strain.temp_min_c, strain.temp_max_c)
+
+    X_y = max(state.X_y, 0.0)
+    X_b = max(state.X_b, 0.0)
+    S   = max(state.S,   0.0)
+    E   = max(state.E,   0.0)
+    t   = state.elapsed_t
+
+    lag_y = _lag_adapt(t, strain.t_lag_y)
+    lag_b = _lag_adapt(t, strain.t_lag_b)
+
+    mu_y = (strain.mu_max_y
+            * _monod(S, strain.Ks_y)
+            * max(0.0, 1.0 - E / strain.E_max_y)
+            * tf_y * lag_y)
+
+    mu_b = (strain.mu_max_b
+            * _monod(E, strain.Ks_b)
+            * tf_b * lag_b)
+
+    mu_net_y = mu_y * max(0.0, 1.0 - X_y / strain.X_max_y) - strain.k_d_y
+    mu_net_b = mu_b * max(0.0, 1.0 - X_b / strain.X_max_b) - strain.k_d_b
+
+    substrate_uptake_y = mu_y * X_y / strain.Yxs_y
+    ethanol_uptake_b   = mu_b * X_b / strain.Yxe_b
+
+    X_y_new = max(0.0, X_y + mu_net_y * X_y * dt)
+    X_b_new = max(0.0, X_b + mu_net_b * X_b * dt)
+    S_new   = max(0.0, S - substrate_uptake_y * dt)
+    E_new   = max(0.0, E + (strain.Yethanol_y * substrate_uptake_y
+                             - ethanol_uptake_b) * dt)
+    t_new   = t + dt
+
+    cer = strain.Yco2_y * substrate_uptake_y * 1000.0   # mg CO₂/L/h
+
+    return (
+        KombuchaCERState(
+            X_y=round(X_y_new, 6), X_b=round(X_b_new, 6),
+            S=round(S_new, 6),     E=round(E_new, 6),
+            elapsed_t=round(t_new, 4),
+            phase=_kombucha_phase(t_new, X_y_new, S_new, strain),
+        ),
+        round(max(0.0, cer), 4),
+    )

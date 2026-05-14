@@ -9,7 +9,11 @@ from app.schemas.schemas import (
     LiveCERPointOut, LiveCERStateOut, LiveCERResponse, CERParamsUpdate,
 )
 from app.services.calculations import calculate_abv, calculate_priming_sugar, analyze_co2_activity
-from app.services.cer_engine import STRAINS, STRAIN_MAP, simulate_cer, CERState, step_cer
+from app.services.cer_engine import (
+    STRAINS, STRAIN_MAP, simulate_cer, CERState, step_cer,
+    KOMBUCHA_STRAINS, KOMBUCHA_STRAIN_MAP,
+    simulate_cer_kombucha, KombuchaCERState, step_cer_kombucha,
+)
 from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.models.models import User, MeasurementLog, ProjectCERState, FermentationProject
@@ -48,20 +52,25 @@ def co2_activity(
 
 @router.get("/cer-strains", response_model=List[CERStrainOut])
 def list_cer_strains(current_user: User = Depends(get_current_user)):
-    return [
+    yeast_out = [
         CERStrainOut(
-            id=s.id,
-            name=s.name,
-            strain_type=s.strain_type,
-            brand=s.brand,
-            opt_temp_c=s.opt_temp_c,
-            temp_min_c=s.temp_min_c,
-            temp_max_c=s.temp_max_c,
-            ethanol_tol=s.ethanol_tol,
+            id=s.id, name=s.name, strain_type=s.strain_type, brand=s.brand,
+            opt_temp_c=s.opt_temp_c, temp_min_c=s.temp_min_c,
+            temp_max_c=s.temp_max_c, ethanol_tol=s.ethanol_tol,
             description=s.description,
         )
         for s in STRAINS
     ]
+    kombucha_out = [
+        CERStrainOut(
+            id=s.id, name=s.name, strain_type=s.strain_type, brand=s.brand,
+            opt_temp_c=s.opt_temp_c, temp_min_c=s.temp_min_c,
+            temp_max_c=s.temp_max_c, ethanol_tol=s.ethanol_tol,
+            description=s.description,
+        )
+        for s in KOMBUCHA_STRAINS
+    ]
+    return yeast_out + kombucha_out
 
 
 @router.post("/cer", response_model=CERResponse)
@@ -70,14 +79,24 @@ def run_cer_simulation(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        result = simulate_cer(
-            strain_id=body.strain_id,
-            sugar_g=body.sugar_g,
-            volume_ml=body.volume_ml,
-            temperature_c=body.temperature_c,
-            duration_hours=body.duration_hours,
-            alert_threshold=body.alert_threshold,
-        )
+        if body.strain_id in KOMBUCHA_STRAIN_MAP:
+            result = simulate_cer_kombucha(
+                strain_id=body.strain_id,
+                sugar_g=body.sugar_g,
+                volume_ml=body.volume_ml,
+                temperature_c=body.temperature_c,
+                duration_hours=body.duration_hours or 336.0,
+                alert_threshold=body.alert_threshold,
+            )
+        else:
+            result = simulate_cer(
+                strain_id=body.strain_id,
+                sugar_g=body.sugar_g,
+                volume_ml=body.volume_ml,
+                temperature_c=body.temperature_c,
+                duration_hours=body.duration_hours,
+                alert_threshold=body.alert_threshold,
+            )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result
@@ -154,13 +173,27 @@ def get_live_cer(
     state_row = db.query(ProjectCERState).filter_by(project_id=project_id).first()
     state_out = None
     if state_row:
-        strain = STRAIN_MAP.get(state_row.strain_id) or STRAIN_MAP["US-05"]
-        # Single tiny step to get instantaneous CER estimate
-        probe_state = CERState(
-            X=state_row.X, S=state_row.S, ethanol_est=state_row.ethanol_est,
-            elapsed_t=state_row.elapsed_t, phase=state_row.phase,
-        )
-        _, cer_est = step_cer(state_row.strain_id, probe_state, state_row.temperature_c, dt=0.01)
+        is_kombucha_strain = state_row.strain_id in KOMBUCHA_STRAIN_MAP
+        if is_kombucha_strain:
+            strain = KOMBUCHA_STRAIN_MAP[state_row.strain_id]
+            kb_probe = KombuchaCERState(
+                X_y=state_row.X,
+                X_b=getattr(state_row, 'X_bact', 0.03) or 0.03,
+                S=state_row.S, E=state_row.ethanol_est,
+                elapsed_t=state_row.elapsed_t, phase=state_row.phase,
+            )
+            _, cer_est = step_cer_kombucha(
+                state_row.strain_id, kb_probe, state_row.temperature_c, dt=0.01
+            )
+        else:
+            strain = STRAIN_MAP.get(state_row.strain_id) or STRAIN_MAP["US-05"]
+            probe_state = CERState(
+                X=state_row.X, S=state_row.S, ethanol_est=state_row.ethanol_est,
+                elapsed_t=state_row.elapsed_t, phase=state_row.phase,
+            )
+            _, cer_est = step_cer(
+                state_row.strain_id, probe_state, state_row.temperature_c, dt=0.01
+            )
         state_out = LiveCERStateOut(
             current_psi=round(max(0.0, state_row.psi_cumulative - state_row.psi_released), 3),
             current_phase=state_row.phase,

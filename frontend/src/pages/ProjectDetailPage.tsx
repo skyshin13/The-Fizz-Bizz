@@ -1778,8 +1778,13 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
 
   const initFromExisting = () => {
     const defaultPsi = cerThreshold || '10'
-    const fmtTime = (h?: number | null, m?: number | null) =>
-      h != null ? `${String(h).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}` : ''
+    const fmtTime = (h?: number | null, m?: number | null) => {
+      if (h == null) return ''
+      // stored as UTC — convert back to local for the time picker
+      const d = new Date()
+      d.setUTCHours(h, m ?? 0, 0, 0)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
     if (!existing) return { reminder_type: 'ph_check', interval_count: '2', interval_unit: 'day' as const, sms_enabled: false, email_enabled: false, psi_threshold: defaultPsi, preferred_time: '' }
     if (existing.reminder_type === 'co2_limit') {
       return { reminder_type: 'co2_limit', interval_count: '1', interval_unit: 'day' as const, sms_enabled: existing.sms_enabled, email_enabled: existing.email_enabled, psi_threshold: String(existing.interval_hours), preferred_time: '' }
@@ -1812,8 +1817,13 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
       let preferred_minute: number | null = null
       if (supportsTime && form.preferred_time) {
         const [h, m] = form.preferred_time.split(':').map(Number)
-        preferred_hour = isNaN(h) ? null : h
-        preferred_minute = isNaN(m) ? null : m
+        if (!isNaN(h)) {
+          // input gives local time — convert to UTC before sending
+          const d = new Date()
+          d.setHours(h, isNaN(m) ? 0 : m, 0, 0)
+          preferred_hour = d.getUTCHours()
+          preferred_minute = d.getUTCMinutes()
+        }
       }
       if (existing) {
         await api.patch(`/reminders/${existing.id}`, {
@@ -1928,7 +1938,7 @@ function ReminderModal({ projectId, existing, cerThreshold, onClose, onAdded }: 
               style={{ ...iStyle, width: 'auto' }}
             />
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.375rem' }}>
-              If set, reminders will fire around this time of day (UTC).
+              If set, reminders will fire around this time each day (your local time).
             </p>
           </div>
         )}

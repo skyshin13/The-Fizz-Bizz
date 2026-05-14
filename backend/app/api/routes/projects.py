@@ -407,6 +407,13 @@ def get_public_project(
     is_liked   = db.query(ProjectLike).filter_by(project_id=project_id, user_id=current_user.id).first() is not None
     comment_count = db.query(ProjectComment).filter_by(project_id=project_id).count()
 
+    album_photos = (
+        db.query(ProjectPhoto)
+        .filter_by(project_id=project_id)
+        .order_by(ProjectPhoto.taken_at)
+        .all()
+    )
+
     return PublicProjectDetailOut(
         id=project.id,
         name=project.name,
@@ -428,13 +435,10 @@ def get_public_project(
         author_avatar_url=project.owner.avatar_url,
         measurements=[SharedMeasurementOut.model_validate(m) for m in user_measurements],
         observations=[
-            SharedObservationOut(
-                content=o.content,
-                photo_url=o.photo_url,
-                created_at=o.created_at,
-            )
+            SharedObservationOut(content=o.content, created_at=o.created_at)
             for o in sorted(project.observations, key=lambda o: o.created_at)
         ],
+        photos=[PhotoOut.model_validate(p) for p in album_photos],
         yeast_strain=yeast_strain,
         like_count=like_count,
         is_liked_by_me=is_liked,

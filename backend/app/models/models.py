@@ -326,6 +326,9 @@ class ProjectCERState(Base):
     psi_cumulative = Column(Float, default=0.0)   # total PSI ever produced
     psi_released   = Column(Float, default=0.0)   # total PSI removed by CO₂ release events
 
+    # Kombucha AAB biomass (unused for yeast/wine/mead projects, defaults to 0)
+    X_bact         = Column(Float, default=0.03)  # g/L acetic acid bacteria biomass
+
     project = relationship("FermentationProject", back_populates="cer_state")
 
 

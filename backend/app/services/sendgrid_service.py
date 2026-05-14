@@ -20,9 +20,13 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
             plain_text_content=body,
         )
         client = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        client.send(message)
-        logger.info(f"Email sent to {to_email}")
-        return True
+        response = client.send(message)
+        msg_id = response.headers.get("X-Message-Id", "unknown")
+        if response.status_code in (200, 202):
+            logger.info(f"Email accepted by SendGrid → {to_email} (msg_id={msg_id})")
+            return True
+        logger.error(f"SendGrid rejected email to {to_email}: status={response.status_code}")
+        return False
     except Exception as e:
         logger.error(f"SendGrid email error: {e}")
         return False

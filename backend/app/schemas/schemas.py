@@ -519,7 +519,6 @@ class SharedMeasurementOut(BaseModel):
 
 class SharedObservationOut(BaseModel):
     content: str
-    photo_url: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -572,6 +571,7 @@ class PublicProjectDetailOut(BaseModel):
     author_avatar_url: Optional[str] = None
     measurements: List[SharedMeasurementOut] = []
     observations: List[SharedObservationOut] = []
+    photos: List[PhotoOut] = []
     yeast_strain: Optional[SharedYeastOut] = None
     like_count: int = 0
     is_liked_by_me: bool = False
