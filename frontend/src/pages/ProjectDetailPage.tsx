@@ -604,7 +604,7 @@ export default function ProjectDetailPage() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '0.75rem' }}>
                   {project.observations.slice().reverse().map(obs => (
-                    <ObservationRow key={obs.id} obs={obs} projectId={projectId!} onSaved={loadProject} />
+                    <ObservationRow key={obs.id} obs={obs} projectId={String(project.id)} onSaved={load} />
                   ))}
                 </div>
               )}
