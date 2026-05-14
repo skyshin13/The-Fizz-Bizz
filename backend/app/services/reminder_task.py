@@ -25,7 +25,7 @@ def _next_trigger(reminder: Reminder, now: datetime) -> datetime:
         # preferred_hour is stored in UTC (frontend converts local → UTC before sending)
         base = now + timedelta(hours=reminder.interval_hours)
         candidate = base.replace(hour=reminder.preferred_hour, minute=minute, second=0, microsecond=0)
-        if candidate < base - timedelta(hours=1):
+        if candidate <= now:
             candidate += timedelta(days=1)
         return candidate
     return now + timedelta(hours=reminder.interval_hours)
