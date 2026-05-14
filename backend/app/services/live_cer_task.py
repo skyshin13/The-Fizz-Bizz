@@ -200,9 +200,10 @@ def _create_initial_state(project, db, now: datetime) -> ProjectCERState:
 # ── Core tick ─────────────────────────────────────────────────────────────────
 
 def _tick():
-    db  = SessionLocal()
+    db  = None
     now = datetime.now(timezone.utc)
     try:
+        db = SessionLocal()
         projects = (
             db.query(FermentationProject)
             .filter(
@@ -336,10 +337,12 @@ def _tick():
         db.commit()
 
     except Exception as e:
-        db.rollback()
+        if db:
+            db.rollback()
         print(f"[live_cer_task] error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 
 # ── Async loop ────────────────────────────────────────────────────────────────
@@ -348,4 +351,7 @@ async def live_cer_loop():
     """Run _tick() every INTERVAL_SECONDS. Started on FastAPI startup."""
     while True:
         await asyncio.sleep(INTERVAL_SECONDS)
-        _tick()
+        try:
+            _tick()
+        except Exception as e:
+            print(f"[live_cer_loop] unhandled error: {e}")
