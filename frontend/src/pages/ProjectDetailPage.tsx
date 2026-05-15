@@ -908,7 +908,6 @@ export default function ProjectDetailPage() {
               </button>
             </form>
           </div>
-        </div>
       </div>
 
       {showMeasure && <MeasurementModal projectId={project.id} isAlcohol={isAlcohol} onClose={() => setShowMeasure(false)} onAdded={() => { setShowMeasure(false); load() }} />}
