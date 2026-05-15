@@ -8,7 +8,7 @@ A full-stack fermentation management platform for homebrewers, kombucha makers, 
 
 ## 🎬 Demo Video
 
-**https://github.com/skyshin13/The-Fizz-Bizz**
+**https://cooperunion-my.sharepoint.com/:v:/g/personal/skyler_shin_cooper_edu/IQCQhBdaYjYeRLxr1SM6pCPEAURiq6B0yuq-fdyoNPL8d-U?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=9aYTBb**
 
 ---
 
