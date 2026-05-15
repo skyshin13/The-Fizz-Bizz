@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from app.db.database import get_db
-from app.models.models import User, FermentationProject, Friendship, ProjectLike
+from app.models.models import User, FermentationProject, Friendship, ProjectLike, UserFollow
 from app.schemas.schemas import UserOut, UserUpdate, PublicUserProfileOut, PublicProjectOut
 from app.api.deps import get_current_user
 
@@ -100,6 +100,10 @@ def get_user_profile(
                 for p in raw_liked
             ]
 
+    follow = db.query(UserFollow).filter_by(
+        follower_id=current_user.id, followed_id=user.id
+    ).first()
+
     return PublicUserProfileOut(
         id=user.id,
         username=user.username,
@@ -128,4 +132,40 @@ def get_user_profile(
         friendship_id=friendship.id if friendship else None,
         friendship_status=friendship.status if friendship else None,
         is_requester=friendship.requester_id == current_user.id if friendship else None,
+        is_followed_by_me=follow is not None,
     )
+
+
+def _public_user_out(u: User, db: Session) -> PublicUserOut:
+    count = db.query(FermentationProject).filter_by(user_id=u.id, is_public=True).count()
+    return PublicUserOut(id=u.id, username=u.username, display_name=u.display_name,
+                         bio=u.bio, avatar_url=u.avatar_url, created_at=u.created_at,
+                         public_project_count=count)
+
+
+@router.get("/{username}/followers", response_model=list[PublicUserOut])
+def get_followers(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    follows = db.query(UserFollow).filter_by(followed_id=user.id).all()
+    return [_public_user_out(db.query(User).filter_by(id=f.follower_id).first(), db)
+            for f in follows if db.query(User).filter_by(id=f.follower_id).first()]
+
+
+@router.get("/{username}/following", response_model=list[PublicUserOut])
+def get_following(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    follows = db.query(UserFollow).filter_by(follower_id=user.id).all()
+    return [_public_user_out(db.query(User).filter_by(id=f.followed_id).first(), db)
+            for f in follows if db.query(User).filter_by(id=f.followed_id).first()]

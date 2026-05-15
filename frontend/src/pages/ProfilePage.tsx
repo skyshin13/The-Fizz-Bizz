@@ -3,10 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { PublicUserProfile, FriendRequest, PublicProject, FriendActivityProject } from '../types'
+import { PublicUserProfile, PublicUser, FriendRequest, PublicProject, FriendActivityProject } from '../types'
 import { useFermentationTypes } from '../hooks/useLookups'
 import toast from 'react-hot-toast'
-import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell, Camera, Heart } from 'lucide-react'
+import { UserPlus, UserCheck, UserX, Clock, Check, Users, FlaskConical, Edit2, X, Phone, Bell, Camera, Heart, UserMinus } from 'lucide-react'
 import styles from './ProfilePage.module.css'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -24,9 +24,12 @@ function OwnProfile() {
   const { user: me, refreshUser } = useAuth()
   const [friends, setFriends] = useState<FriendRequest[]>([])
   const [friendActivity, setFriendActivity] = useState<FriendActivityProject[]>([])
+  const [followers, setFollowers] = useState<PublicUser[]>([])
+  const [following, setFollowing] = useState<PublicUser[]>([])
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
   const { getEmoji } = useFermentationTypes()
+  const navigate = useNavigate()
 
   const loadFriends = () => {
     setLoading(true)
@@ -38,7 +41,11 @@ function OwnProfile() {
     api.get('/explore/friend-activity', { params: { per_page: 6 } })
       .then(r => setFriendActivity(r.data))
       .catch(() => {})
-  }, [])
+    if (me?.username) {
+      api.get(`/users/${me.username}/followers`).then(r => setFollowers(r.data)).catch(() => {})
+      api.get(`/users/${me.username}/following`).then(r => setFollowing(r.data)).catch(() => {})
+    }
+  }, [me?.username])
 
   const accepted = friends.filter(f => f.status === 'accepted')
   const pendingReceived = friends.filter(f => f.status === 'pending' && f.receiver_id === me?.id)
@@ -168,7 +175,7 @@ function OwnProfile() {
       {/* Pending sent */}
       {pendingSent.length > 0 && (
         <div className="fade-in-delay-2" style={{ marginTop: '2rem' }}>
-          <h2 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Pending Requests Sent</h2>
+          <h2 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Following (pending)</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {pendingSent.map(f => (
               <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--card-bg)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
@@ -177,8 +184,8 @@ function OwnProfile() {
                   <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{f.friend.display_name || f.friend.username}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.775rem' }}> @{f.friend.username}</span>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <Clock size={11} /> Pending
+                <span style={{ fontSize: '0.75rem', color: 'var(--moss)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <UserCheck size={11} /> Following
                 </span>
                 <button onClick={() => removeFriend(f.id)} title="Cancel request" style={{ padding: 4, background: 'transparent', color: 'var(--text-muted)', borderRadius: 4 }}>
                   <UserX size={14} />
@@ -188,6 +195,12 @@ function OwnProfile() {
           </div>
         </div>
       )}
+
+      {/* Followers / Following */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '2rem' }}>
+        <FollowList title="Followers" users={followers} onNavigate={u => navigate(`/profile/${u.username}`)} />
+        <FollowList title="Following" users={following} onNavigate={u => navigate(`/profile/${u.username}`)} />
+      </div>
     </div>
   )
 }
@@ -197,6 +210,8 @@ function OwnProfile() {
 function OtherProfile({ username }: { username: string }) {
   const { user: me } = useAuth()
   const [profile, setProfile] = useState<PublicUserProfile | null>(null)
+  const [followers, setFollowers] = useState<PublicUser[]>([])
+  const [following, setFollowing] = useState<PublicUser[]>([])
   const [loading, setLoading] = useState(true)
   const { getEmoji } = useFermentationTypes()
   const navigate = useNavigate()
@@ -207,6 +222,8 @@ function OtherProfile({ username }: { username: string }) {
       .then(r => setProfile(r.data))
       .catch(() => toast.error('User not found'))
       .finally(() => setLoading(false))
+    api.get(`/users/${username}/followers`).then(r => setFollowers(r.data)).catch(() => {})
+    api.get(`/users/${username}/following`).then(r => setFollowing(r.data)).catch(() => {})
   }
 
   useEffect(() => { load() }, [username])
@@ -244,9 +261,16 @@ function OtherProfile({ username }: { username: string }) {
       )
     }
     if (profile.friendship_status === 'pending') {
+      if (profile.is_requester) {
+        return (
+          <button onClick={removeFriend} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.625rem 1.25rem', background: 'var(--parchment)', color: 'var(--moss)', borderRadius: '10px', fontWeight: 600, fontSize: '0.875rem', border: '1px solid var(--border)' }}>
+            <UserCheck size={15} /> Following
+          </button>
+        )
+      }
       return (
         <button onClick={removeFriend} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.625rem 1.25rem', background: 'var(--parchment)', color: 'var(--text-secondary)', borderRadius: '10px', fontWeight: 600, fontSize: '0.875rem', border: '1px solid var(--border)' }}>
-          <Clock size={15} /> {profile.is_requester ? 'Pending' : 'Accept Request'}
+          <Clock size={15} /> Accept Request
         </button>
       )
     }
@@ -308,6 +332,12 @@ function OtherProfile({ username }: { username: string }) {
           </div>
         </div>
       )}
+
+      {/* Followers / Following */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '2rem' }}>
+        <FollowList title="Followers" users={followers} onNavigate={u => navigate(`/profile/${u.username}`)} />
+        <FollowList title="Following" users={following} onNavigate={u => navigate(`/profile/${u.username}`)} />
+      </div>
     </div>
   )
 }
@@ -499,6 +529,35 @@ function EditProfileModal({ me, onClose, onSaved }: { me: any; onClose: () => vo
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+function FollowList({ title, users, onNavigate }: { title: string; users: PublicUser[]; onNavigate: (u: PublicUser) => void }) {
+  return (
+    <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-light)', padding: '1rem 1.25rem' }}>
+      <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.875rem' }}>
+        {title} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({users.length})</span>
+      </h3>
+      {users.length === 0 ? (
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No {title.toLowerCase()} yet.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+          {users.map(u => (
+            <div
+              key={u.id}
+              onClick={() => onNavigate(u)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer' }}
+            >
+              <Avatar name={u.display_name || u.username} avatarUrl={u.avatar_url} size={30} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.display_name || u.username}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@{u.username}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

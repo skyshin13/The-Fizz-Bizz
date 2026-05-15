@@ -710,3 +710,4 @@ class PublicUserProfileOut(PublicUserOut):
     friendship_id: Optional[int] = None
     friendship_status: Optional[str] = None
     is_requester: Optional[bool] = None
+    is_followed_by_me: bool = False

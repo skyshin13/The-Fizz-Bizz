@@ -163,6 +163,7 @@ export interface PublicUserProfile extends PublicUser {
   friendship_id?: number
   friendship_status?: 'pending' | 'accepted'
   is_requester?: boolean
+  is_followed_by_me: boolean
 }
 
 export interface ProjectComment {
