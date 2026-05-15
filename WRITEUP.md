@@ -218,17 +218,19 @@ Each project resolves a yeast strain from its `ProjectYeastConnection`. The stra
 
 ### What was harder than expected
 
-**Timezone arithmetic** was a consistent source of subtle bugs. The frontend converts the user's preferred reminder time to UTC before sending it to the API. The backend stores and schedules in UTC throughout. Adding "display in Eastern time" for email notifications required carefully isolating the conversion to a single `_fmt_time()` helper — every earlier attempt at converting earlier in the pipeline introduced double-conversion bugs where reminders would fire 4–5 hours off or not at all.
+One of the hardest parts of the project was getting the CO₂ live production graph to work properly, or to even work at all. OFten times, it was stationary and the calculations were not being executed automatically (and properly). It was also difficult getting the graph behavior to update based on changing the yeast strain, sugar amount, volume, and other parameters. I wanted the user to be able to see the data actually updating, so I implemented an option to be able to change the time interval to see the recent data points, and change the calculations to be updated every few seconds. With this new update, data points would not appear or calculations were not occuring. 
 
-**Separating simulation writes from user reads** was not anticipated at the start. Once the CER background task began writing thousands of rows per day into `measurement_logs`, every dashboard query started returning machine-generated data mixed with the user's three carefully logged readings. Adding `_USER_MEAS_FILTER` cleanly solved it, but it required going back and auditing every query in the codebase.
+The CO₂ production engine is also a background simulation which writes rows into `measurement_logs` automatically; things like "at 2am the model calculated 4.2 PSI." It does this constantly, so over a week it might write thousands of rows. Both the charts query this to show readings, both manual and machine generated inputs. The fix was _USER_MEAS_FILTER — a SQL filter that says "only return rows where the user actually typed something meaningful (pH, gravity, notes, etc.)." Machine-generated rows only have co2_psi and temperature set, so they get excluded. This filter had to be added to every place in the codebase that queries measurements such as the dashboard, the project detail page, the public view, and the charts, because they'd all been written assuming all rows in that table were user data.
 
-**The background task resilience problem** emerged in production: a single database hiccup during a reminder check would kill the asyncio coroutine permanently (because `db = SessionLocal()` was outside the `try` block). The fix — moving session creation inside `try`, wrapping each project iteration in its own exception handler, and catching unhandled exceptions in the outer loop — turned a fragile task into one that survives transient DB errors.
+Setting up email reminders was difficult in the sense of trying to get the app to send the email. Getting the reminder set up email was successful, but some of the reminder notifications would not come through at the specificed times.
 
 ### What was easier than expected
 
-**FastAPI + SQLAlchemy** made adding new endpoints fast. Pydantic schemas provided free request validation and clear error messages. The combination meant new features (explore feed, comment threads, share links) took hours rather than days.
+FastAPI and SQLAlchemy made adding new endpoints fast. Pydantic schemas provided free request validation and clear error messages. The combination meant new features (explore feed, comment threads, share links) took hours rather than days.
 
-**Supabase Storage** for photo uploads required minimal backend work — the frontend uploads directly to the bucket using the anon key and returns a URL. The backend stores only the string. No file-handling code on the server.
+Using Supabase Storage for photo uploads also required minimal work on the frontend since it only uploads directly to the bucket using the anon key and returns a URL. The backend stores only the string. No file-handling code on the server.
+
+Implementing the stack at the very beginning in general also proved not too difficult.
 
 ### AI-assisted development
 
