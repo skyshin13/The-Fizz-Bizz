@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
-from app.models.models import User, Friendship, FriendshipStatus, FermentationProject
+from app.models.models import User, Friendship, FriendshipStatus, FermentationProject, UserFollow
 from app.schemas.schemas import FriendshipOut, PublicUserOut
 from app.api.deps import get_current_user
 
@@ -86,6 +86,14 @@ def send_friend_request(
 
     f = Friendship(requester_id=current_user.id, receiver_id=target.id)
     db.add(f)
+
+    # Requester automatically follows the target while request is pending
+    already_following = db.query(UserFollow).filter_by(
+        follower_id=current_user.id, followed_id=target.id
+    ).first()
+    if not already_following:
+        db.add(UserFollow(follower_id=current_user.id, followed_id=target.id))
+
     db.commit()
     db.refresh(f)
     return _friendship_out(f, target, db)
@@ -106,6 +114,14 @@ def accept_friend_request(
         raise HTTPException(404, "Pending friend request not found")
 
     f.status = FriendshipStatus.ACCEPTED
+
+    # Acceptor follows back, completing the mutual follow
+    already_following = db.query(UserFollow).filter_by(
+        follower_id=current_user.id, followed_id=f.requester_id
+    ).first()
+    if not already_following:
+        db.add(UserFollow(follower_id=current_user.id, followed_id=f.requester_id))
+
     db.commit()
     db.refresh(f)
 
@@ -126,5 +142,13 @@ def remove_friend(
     ).first()
     if not f:
         raise HTTPException(404, "Friendship not found")
+
+    # Remove follow relationships in both directions
+    other_id = f.receiver_id if f.requester_id == current_user.id else f.requester_id
+    db.query(UserFollow).filter(
+        ((UserFollow.follower_id == current_user.id) & (UserFollow.followed_id == other_id)) |
+        ((UserFollow.follower_id == other_id) & (UserFollow.followed_id == current_user.id))
+    ).delete(synchronize_session=False)
+
     db.delete(f)
     db.commit()
