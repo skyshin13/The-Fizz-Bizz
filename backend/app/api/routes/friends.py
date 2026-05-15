@@ -143,11 +143,9 @@ def remove_friend(
     if not f:
         raise HTTPException(404, "Friendship not found")
 
-    # Remove follow relationships in both directions
-    other_id = f.receiver_id if f.requester_id == current_user.id else f.requester_id
-    db.query(UserFollow).filter(
-        ((UserFollow.follower_id == current_user.id) & (UserFollow.followed_id == other_id)) |
-        ((UserFollow.follower_id == other_id) & (UserFollow.followed_id == current_user.id))
+    # Remove only the receiver's follow of the requester — the requester stays following
+    db.query(UserFollow).filter_by(
+        follower_id=f.receiver_id, followed_id=f.requester_id
     ).delete(synchronize_session=False)
 
     db.delete(f)
