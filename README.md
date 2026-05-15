@@ -86,22 +86,6 @@ Frontend runs at: **http://localhost:5173**
 
 ---
 
-## Demo Login
-
-```
-Email:    brewer@fizzbizz.com
-Password: password123
-```
-
-The seed script populates:
-- 4 fermentation projects (kombucha, APA beer, ginger soda, kimchi)
-- Historical measurement data with pH, SG, ABV, CO₂ readings
-- 5 yeast/SCOBY strain profiles
-- 2 starter recipes
-- Observation notes and photos
-
----
-
 ## Features
 
 ### Projects
