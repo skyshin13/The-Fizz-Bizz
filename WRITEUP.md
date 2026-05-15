@@ -85,7 +85,7 @@ Schema definitions: [`backend/app/models/models.py`](backend/app/models/models.p
             │ Third-party notifications
 ┌───────────▼──────────────────────────────────────────────────┐
 │   SendGrid  (transactional email)                            │
-│   Twilio    (SMS)                                            │
+│                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
