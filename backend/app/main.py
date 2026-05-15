@@ -67,6 +67,37 @@ def _run_migrations():
             ))
         except Exception:
             pass
+        # Back-fill user_follows from existing friendships
+        for stmt in [
+            # accepted: requester → receiver
+            """INSERT INTO user_follows (follower_id, followed_id)
+               SELECT f.requester_id, f.receiver_id FROM friendships f
+               WHERE f.status = 'accepted'
+               AND NOT EXISTS (
+                   SELECT 1 FROM user_follows uf
+                   WHERE uf.follower_id = f.requester_id AND uf.followed_id = f.receiver_id
+               )""",
+            # accepted: receiver → requester
+            """INSERT INTO user_follows (follower_id, followed_id)
+               SELECT f.receiver_id, f.requester_id FROM friendships f
+               WHERE f.status = 'accepted'
+               AND NOT EXISTS (
+                   SELECT 1 FROM user_follows uf
+                   WHERE uf.follower_id = f.receiver_id AND uf.followed_id = f.requester_id
+               )""",
+            # pending: requester → receiver
+            """INSERT INTO user_follows (follower_id, followed_id)
+               SELECT f.requester_id, f.receiver_id FROM friendships f
+               WHERE f.status = 'pending'
+               AND NOT EXISTS (
+                   SELECT 1 FROM user_follows uf
+                   WHERE uf.follower_id = f.requester_id AND uf.followed_id = f.receiver_id
+               )""",
+        ]:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                pass
         conn.commit()
 
 
