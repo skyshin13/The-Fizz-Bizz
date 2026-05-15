@@ -112,8 +112,8 @@ Frontend runs at: **http://localhost:5173**
 ### Social
 - Explore feed: browse public projects by fermentation type, status, or search
 - Like and comment on public projects (threaded replies)
-- Friend requests: auto-follow on request, mutual follow on accept
-- Public user profiles with project and activity feeds
+- Friend requests: auto-follow on request, mutual follow on accept; requester stays as follower after unfriend
+- Public user profiles with project and activity feeds; followers/following lists on each profile
 - Friend activity feed showing recent likes and comments
 
 ### Yeast Library
@@ -287,6 +287,8 @@ Users
   GET    /api/users/me
   PATCH  /api/users/me
   GET    /api/users/{username}
+  GET    /api/users/{username}/followers
+  GET    /api/users/{username}/following
 
 Yeasts
   GET    /api/yeasts
