@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from app.db.database import get_db
 from app.models.models import User, FermentationProject, Friendship, ProjectLike, UserFollow
-from app.schemas.schemas import UserOut, UserUpdate, PublicUserProfileOut, PublicProjectOut
+from app.schemas.schemas import UserOut, UserUpdate, PublicUserProfileOut, PublicProjectOut, PublicUserOut
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/users", tags=["Users"])
